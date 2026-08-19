@@ -224,20 +224,22 @@ def rm(n):
 # Topbar
 # ==========================================================================
 
-_hdr = st.columns([2.6, 0.25, 0.25, 0.25])
+_hdr = st.columns([0.12, 2.6, 0.25, 0.25, 0.25])
 with _hdr[0]:
-    st.markdown(
-        f'<div class="brandbar"><span class="brand">Pengurusan Air Pahang '
-        f'Berhad</span><span class="brandsub">Non-Revenue Water intervention '
-        f'targeting · {monthly.plant.nunique()} plants · '
-        f'{monthly.district.nunique()} districts · {YEAR_SPAN}</span></div>',
-        unsafe_allow_html=True)
+    st.image("logo.png", width=50)
 
 with _hdr[1]:
+    st.markdown(
+        f'<div class="brandbar">'
+        f'<span class="brand" style="font-size: 24px; font-weight: bold;">Pengurusan Air Pahang Berhad</span>'
+        f'<span class="brandsub" style="font-size: 14px;">Non-Revenue Water intervention targeting · {monthly.plant.nunique()} plants · {monthly.district.nunique()} districts · {YEAR_SPAN}</span></div>',
+        unsafe_allow_html=True)
+
+with _hdr[2]:
     year = st.selectbox("Year", sorted(YEARS, reverse=True), index=0,
                         format_func=year_label, label_visibility="collapsed")
 
-with _hdr[2]:
+with _hdr[3]:
     with st.popover("Filters", width='stretch'):
         selected_filter = st.radio("Filter by:", ["Region", "District", "Area type"], horizontal=True, key="filter")
 
@@ -254,7 +256,7 @@ with _hdr[2]:
             areas = st.multiselect("Area type", sorted(yearly.area_type.unique()), default=sorted(yearly.area_type.unique()))
         st.caption("Filters apply to every view.")
       
-with _hdr[3]:
+with _hdr[4]:
     with st.popover("Display", width='stretch'):
         st.radio("Appearance", ["Auto", "Light", "Dark"], horizontal=True,
                  key="appearance",
