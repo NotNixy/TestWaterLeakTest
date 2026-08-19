@@ -221,14 +221,8 @@ def rm(n):
 
 
 # ==========================================================================
-# Sidebar
+# Topbar
 # ==========================================================================
-
-
-# ---- Top control strip ---------------------------------------------------
-# The sidebar is gone. Global controls that apply to every view live here in a
-# single slim row; controls that apply to one view only (the LIPS weights) live
-# inside that view instead. Popovers keep the permanent height cost to one row.
 
 _hdr = st.columns([2.6, 0.25, 0.25, 0.25])
 with _hdr[0]:
@@ -366,6 +360,8 @@ tabs = st.tabs(["Overview", "Rate vs Volume", "Priority Schedule",
 # ==========================================================================
 # TAB 1 — Overview
 # ==========================================================================
+
+
 with TAB_OVERVIEW:
     # One view, so no sub-tab row. Both panels are framed in the same terms as
     # the Priority Schedule: recoverable water, ranked by volume. Total NRW is
@@ -450,6 +446,8 @@ with TAB_OVERVIEW:
 # ==========================================================================
 # TAB 2 — Rate vs Volume
 # ==========================================================================
+
+
 with TAB_RATEVOL:
     # A single view: the divergence IS the rate-versus-volume argument, so it
     # no longer sits behind a sub-tab. The two ranked queue tables were removed;
@@ -588,6 +586,8 @@ with TAB_RATEVOL:
 # ==========================================================================
 # TAB 3 — Priority Schedule
 # ==========================================================================
+
+
 with TAB_SCHEDULE:
     _sub = st.tabs(["Ranking", "Recovery curve", "Full schedule"])
     with _sub[0]:
@@ -1090,7 +1090,7 @@ transfers to real PAIP data; the exact AUC may not.
 </div>""", unsafe_allow_html=True)
 
 # ==========================================================================
-# TAB 5 — Loss Composition
+# TAB 4 — Loss Composition
 # ==========================================================================
 with TAB_COMPOSITION:
   
@@ -1130,20 +1130,14 @@ with TAB_COMPOSITION:
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
 
-      
 
 
 # ==========================================================================
-# TAB 5 — Financial Impact
+# TAB 5 — Plant Profile
 # ==========================================================================
 
 
-    
 
-
-# ==========================================================================
-# TAB 6 — Plant Profile
-# ==========================================================================
 with TAB_PLANT:
     st.markdown("#### Plant profile")
     plant_list = sel.sort_values("lips_rank").plant.tolist()
@@ -1373,18 +1367,3 @@ with TAB_PLANT:
                              "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%.0f"),
                              "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d")})
 
-
-
-# ==========================================================================
-# TAB 7 — Method & Data Quality
-# ==========================================================================
-
-
-
-
-
-# ==========================================================================
-# TAB 9 — Data Management
-# ==========================================================================
-
-    
