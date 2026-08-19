@@ -226,7 +226,7 @@ def rm(n):
 
 _hdr = st.columns([0.12, 2.6, 0.25, 0.25, 0.25])
 with _hdr[0]:
-    st.image("logo.png", width=50)
+    st.image(DATA / "logo.png", width=50)
 
 with _hdr[1]:
     st.markdown(
