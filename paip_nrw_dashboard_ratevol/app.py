@@ -51,22 +51,24 @@ st.markdown(T.css, unsafe_allow_html=True)
 
 PLOT_CFG = {"displayModeBar": False, "responsive": True}
 
-# LIPS ranks plants by the water a repair would actually recover, and by
-# nothing else. Every component that was not a volume was removed:
-#   nrw_pct            a ratio, not a quantity - ranking by it is the exact
-#                      mistake this dashboard exists to correct
-#   bursts_per_100km   a count of events, not water
-#   asset_age_index    a condition proxy, not water
-#   physical_share_pct algebraically already inside physical_loss_m3
-#                      (physical_loss = nrw x share / 100, exact to 0.000 m3),
-#                      so weighting it separately double-counted it
-# The old six-component score put only 33.9% of recoverable water in its top
-# ten; ranking on volume alone puts 64.0% there.
+# LIPS balances volume density, pipe condition, asset age, and account exposure:
+#   nrw_per_km_m3 (40%)    : Combined Loss Density (NRW volume concentration)
+#   bursts_per_100km (25%) : Burst Rate (Proxy for physical pipe failure)
+#   plant_age_yr (20%)     : Asset Condition / Deterioration risk
+#   account_density (15%)  : Commercial & Metering risk exposure
 LIPS_COMPONENTS = {
-    "physical_loss_m3": ("Recoverable volume",
-                         "m³ of physical leakage a repair would actually recover"),
+    "nrw_per_km_m3": ("Loss Density", "m³ of NRW lost per km of pipe network"),
+    "bursts_per_100km": ("Burst Rate", "Pipe bursts recorded per 100 km"),
+    "plant_age_yr": ("Plant Age", "Water treatment plant age in years"),
+    "account_density": ("Account Density", "Customer accounts per km of main"),
 }
-DEFAULT_WEIGHTS = {"physical_loss_m3": 100}
+
+DEFAULT_WEIGHTS = {
+    "nrw_per_km_m3": 40,
+    "bursts_per_100km": 25,
+    "plant_age_yr": 20,
+    "account_density": 15,
+}
 
 
 # ==========================================================================
@@ -164,31 +166,30 @@ def percentile_rank(s):
 
 @st.cache_data
 def score_lips(df: pd.DataFrame, weights: tuple) -> pd.DataFrame:
-    """Rank plants by recoverable water.
+    """Rank plants using the 4-Factor Leakage Intervention Priority Score.
 
-    LIPS is now a single measure — physical loss volume — expressed as a 0-100
-    percentile within the filtered cohort so it stays comparable when the
-    selection changes. Because it is a monotone transform of one column, the
-    LIPS order and a straight sort by m³ are identical; the percentile exists
-    only to keep the score on a readable scale.
-
-    The weighted-sum machinery is retained so the score remains one line to
-    extend if PAIP later supplies a genuinely volumetric second measure (repair
-    cost per m³ would be the obvious one).
+    Calculates percentile ranks (0–100) for loss density, burst rate,
+    plant age, and account density within the active cohort.
     """
     w = dict(weights)
     total = sum(w.values()) or 1
     out = df.copy()
+    
+    # Ensure derived metric exists if not pre-computed in CSV
+    if "account_density" not in out.columns and "customer_accounts" in out.columns and "pipe_length_km" in out.columns:
+        out["account_density"] = out.customer_accounts / out.pipe_length_km
+
     score = pd.Series(0.0, index=out.index)
     for col, wt in w.items():
-        pr = percentile_rank(out[col])
-        out[f"pr_{col}"] = pr
-        score += pr * (wt / total)
+        if col in out.columns:
+            pr = percentile_rank(out[col])
+            out[f"pr_{col}"] = pr
+            score += pr * (wt / total)
+            
     out["lips"] = score.round(2)
-    # A repair queue must be a strict order: two plants cannot both be
-    # "priority 31". Ties on LIPS are broken by physical loss volume, so the
-    # plant with more recoverable water is visited first.
-    out = out.sort_values(["lips", "physical_loss_m3"], ascending=False)
+    
+    # Tie-breaking priority: LIPS Score -> NRW Loss Density -> Raw NRW Volume
+    out = out.sort_values(["lips", "nrw_per_km_m3", "nrw_m3"], ascending=False)
     out["lips_rank"] = np.arange(1, len(out) + 1)
     out["volume_rank"] = out.nrw_m3.rank(ascending=False, method="first").astype(int)
     out["rate_rank"] = out.nrw_pct.rank(ascending=False, method="first").astype(int)
@@ -226,7 +227,7 @@ def rm(n):
 
 _hdr = st.columns([0.12, 2.6, 0.25, 0.25, 0.25])
 with _hdr[0]:
-    st.image(DATA / "logo.png", width=50)
+    st.image("logo.png", width=50)
 
 with _hdr[1]:
     st.markdown(
@@ -593,80 +594,59 @@ with TAB_RATEVOL:
 with TAB_SCHEDULE:
     _sub = st.tabs(["Ranking", "Recovery curve", "Full schedule"])
     with _sub[0]:
-        st.markdown("#### Leakage Intervention Priority Score")
+        st.markdown("#### Leakage Intervention Priority Score (4-Factor LIPS)")
         st.markdown(T.callout(
-            "LIPS ranks plants by <b>the water a repair would actually "
-            "recover</b> — physical loss volume — and by nothing else. Loss "
-            "rate, burst frequency and asset age were removed: none of them is "
-            "a quantity of water, and ranking by a <i>rate</i> is the exact "
-            "mistake this dashboard exists to correct. Repairable share was "
-            "removed too, because it is already inside physical loss volume "
-            "(<code>physical loss = NRW × share ÷ 100</code>, exact to "
-            "0.000 m³) and weighting it separately double-counted it.<br><br>"
-            "The score is that volume expressed as a <b>0–100 percentile</b> "
-            "within the plants currently on screen, so it stays readable when "
-            "you filter. Being a monotone transform of one column, the LIPS "
-            "order and a straight sort by m³ are identical."),
-            unsafe_allow_html=True)
+            "LIPS prioritizes intervention by combining four operational indicators into a balanced 0–100 score:<br>"
+            "• <b>Loss Density (40%)</b>: Concentration of NRW volume per kilometer of pipe.<br>"
+            "• <b>Burst Rate (25%)</b>: Bursts per 100 km (proxy for pipe structural failure).<br>"
+            "• <b>Plant Age (20%)</b>: Deterioration and asset condition risk.<br>"
+            "• <b>Account Density (15%)</b>: Customer connections per km (commercial/metering exposure)."
+        ), unsafe_allow_html=True)
 
         c1, c2 = st.columns([1, 1])
         n_show = min(15, n_plants)
-        top = sel.nsmallest(n_show, "lips_rank").sort_values("physical_loss_m3")
+        top = sel.nsmallest(n_show, "lips_rank").sort_values("lips")
 
         with c1:
             fig = go.Figure(go.Bar(
-                x=top.physical_loss_m3, y=top.plant, orientation="h",
-                marker=dict(color=top.physical_loss_m3, colorscale=T.SEQ,
+                x=top.lips, y=top.plant, orientation="h",
+                marker=dict(color=top.lips, colorscale=T.SEQ,
                             line=dict(color=T.SURFACE, width=2), showscale=False),
-                text=[m3(v) for v in top.physical_loss_m3],
+                text=[f"{v:.1f}" for v in top.lips],
                 textposition="outside", textfont=dict(size=11, color=T.INK_2),
-                customdata=np.stack([top.district, top.lips, top.lips_rank,
-                                     top.nrw_pct], -1),
+                customdata=np.stack([top.district, top.nrw_per_km_m3, top.bursts_per_100km, top.lips_rank], -1),
                 hovertemplate=("<b>%{y}</b> · %{customdata[0]}<br>"
-                               "Recoverable  %{x:,.0f} m³<br>"
-                               "LIPS  %{customdata[1]:.1f}  "
-                               "(priority %{customdata[2]})<br>"
-                               "Loss rate  %{customdata[3]:.1f}%<extra></extra>")))
+                               "LIPS Score: %{x:.1f} (Priority %{customdata[3]})<br>"
+                               "Loss Density: %{customdata[1]:,.0f} m³/km<br>"
+                               "Burst Rate: %{customdata[2]:.1f} /100km<extra></extra>")))
             fig.update_layout(
-                title=f"Top {n_show} plants by recoverable water", height=430,
+                title=f"Top {n_show} Plants by LIPS Priority", height=430,
                 bargap=0.3,
-                xaxis=dict(title="Physical loss (m³ per year)",
-                           range=[0, top.physical_loss_m3.max() * 1.22]),
+                xaxis=dict(title="LIPS Score (0–100)", range=[0, 115]),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
 
         with c2:
-            # Replaces the old component decomposition, which no longer exists.
-            # This shows WHY the score uses physical loss rather than total NRW:
-            # the commercial share is real water lost, but a pipe crew cannot
-            # recover it — it needs meters and billing enforcement instead.
+            # Component breakdown chart showing percentiles for each factor
             fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=top.physical_loss_m3, y=top.plant, orientation="h",
-                name="Recoverable by repair",
-                marker=dict(color=T.BLUE, line=dict(color=T.SURFACE, width=2)),
-                customdata=top.physical_share_pct,
-                hovertemplate=("<b>%{y}</b><br>Physical  %{x:,.0f} m³ "
-                               "(%{customdata:.0f}% of loss)<extra></extra>")))
-            fig.add_trace(go.Bar(
-                x=top.commercial_loss_m3, y=top.plant, orientation="h",
-                name="Not recoverable by repair",
-                marker=dict(color=T.ORANGE, line=dict(color=T.SURFACE, width=2)),
-                customdata=100 - top.physical_share_pct,
-                hovertemplate=("<b>%{y}</b><br>Commercial  %{x:,.0f} m³ "
-                               "(%{customdata:.0f}% of loss)<extra></extra>")))
+            comp_cols = {
+                "pr_nrw_per_km_m3": ("Loss Density (40%)", T.BLUE),
+                "pr_bursts_per_100km": ("Burst Rate (25%)", T.ORANGE),
+                "pr_plant_age_yr": ("Plant Age (20%)", T.NEUTRAL),
+                "pr_account_density": ("Account Density (15%)", T.AQUA)
+            }
+            for col, (label, color) in comp_cols.items():
+                if col in top.columns:
+                    fig.add_trace(go.Bar(
+                        x=top[col], y=top.plant, orientation="h", name=label,
+                        marker=dict(color=color)
+                    ))
             fig.update_layout(
-                title="Why volume, not total NRW — what a crew can actually get",
+                title="LIPS Component Percentile Profile",
                 height=430, barmode="stack", bargap=0.3,
-                xaxis=dict(title="Water lost (m³ per year)"),
+                xaxis=dict(title="Weighted Component Contribution"),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
-            st.markdown(
-                '<div class="caption">Blue is what the score counts. Orange is '
-                'commercial loss — real water, but recovered by metering and '
-                'enforcement, not by a repair crew, so it is excluded from the '
-                'ranking.</div>', unsafe_allow_html=True)
-
 
     with _sub[1]:
         st.markdown("#### Recovery curve — how far a crew programme gets")
@@ -730,22 +710,22 @@ with TAB_SCHEDULE:
         st.markdown("#### Full intervention schedule")
         sched = sel.sort_values("lips_rank")[
             ["lips_rank", "plant", "district", "area_type", "lips",
-             "physical_loss_m3", "nrw_m3", "commercial_loss_m3", "nrw_pct",
-             "nrw_value_rm", "volume_rank", "rate_rank"]]
+             "nrw_per_km_m3", "bursts_per_100km", "plant_age_yr", "account_density",
+             "nrw_m3", "nrw_pct", "volume_rank", "rate_rank"]]
         st.dataframe(
             sched, width='stretch', hide_index=True, height=545,
             column_config={
                 "lips_rank": st.column_config.NumberColumn("Priority", width="small"),
                 "plant": "Plant", "district": "District", "area_type": "Area",
-                "lips": st.column_config.ProgressColumn("LIPS", min_value=0,
-                                                        max_value=100, format="%.1f"),
+                "lips": st.column_config.ProgressColumn("LIPS Score", min_value=0, max_value=100, format="%.1f"),
+                "nrw_per_km_m3": st.column_config.NumberColumn("Loss Density (m³/km)", format="%,d"),
+                "bursts_per_100km": st.column_config.NumberColumn("Bursts /100km", format="%.1f"),
+                "plant_age_yr": st.column_config.NumberColumn("Plant Age (yr)", format="%.0f"),
+                "account_density": st.column_config.NumberColumn("Acc Density (/km)", format="%.1f"),
                 "nrw_m3": st.column_config.NumberColumn("NRW m³", format="%,d"),
                 "nrw_pct": st.column_config.NumberColumn("Rate", format="%.1f%%"),
-                "physical_loss_m3": st.column_config.NumberColumn("Recoverable m³", format="%,d"),
-                "commercial_loss_m3": st.column_config.NumberColumn("Not recoverable m³", format="%,d"),
-                "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d"),
-                "volume_rank": st.column_config.NumberColumn("Vol rank"),
-                "rate_rank": st.column_config.NumberColumn("Rate rank")})
+                "volume_rank": st.column_config.NumberColumn("Vol Rank"),
+                "rate_rank": st.column_config.NumberColumn("Rate Rank")})
         st.download_button("Download schedule (CSV)", sched.to_csv(index=False),
                            f"paip_lips_schedule_{year}.csv", "text/csv")
 
