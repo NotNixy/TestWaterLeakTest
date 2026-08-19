@@ -117,8 +117,6 @@ def plant_year(df: pd.DataFrame) -> pd.DataFrame:
         district=("district", "first"),
         region=("region", "first"),
         area_type=("area_type", "first"),
-        # Counted from date, not record_id: record_id is optional in the source
-        # and is rebuilt rather than required.
         months=("date", "nunique"),
         days_observed=("date", lambda s: s.dt.days_in_month.sum()),
         production_m3=("production_m3", "sum"),
@@ -149,16 +147,16 @@ def plant_year(df: pd.DataFrame) -> pd.DataFrame:
         water_quality_compliance_pct=("water_quality_compliance_pct", "mean"),
         nrw_pct_monthly_sd=("nrw_pct", "std"),
     )
-    # Rate is recomputed from the annual totals, not averaged from monthly
-    # rates, so it is production-weighted rather than month-weighted.
+    
+    # Rates recomputed from annual totals
     g["nrw_pct"] = g.nrw_m3 / g.production_m3 * 100
     g["physical_share_pct"] = g.physical_loss_m3 / g.nrw_m3 * 100
     g["nrw_per_km_m3"] = g.nrw_m3 / g.pipe_length_km
     g["physical_loss_per_km_m3"] = g.physical_loss_m3 / g.pipe_length_km
     g["bursts_per_100km"] = g.pipe_bursts / g.pipe_length_km * 100
+    g["account_density"] = g.customer_accounts / g.pipe_length_km  # Added for 4-factor LIPS
     g["nrw_per_account_m3"] = g.nrw_m3 / g.customer_accounts
-    # Divided by days actually observed, not a hard-coded 365, so a part-year
-    # does not report an artificially low daily loss.
+    
     g["loss_per_connection_l_day"] = (
         g.physical_loss_m3 * 1000 / g.customer_accounts / g.days_observed
     )
@@ -169,11 +167,6 @@ def plant_year(df: pd.DataFrame) -> pd.DataFrame:
                             + g.meter_age_yr / g.meter_age_yr.max() * 0.4) * 100
 
     # ---- Partial-year handling ------------------------------------------
-    # A year still in progress must not be compared to a full year on raw
-    # volume. `annualise` scales a part-year up to a 12-month equivalent so
-    # trend charts stay honest; rates and per-unit measures are ratios and need
-    # no adjustment. Both raw and annualised volumes are kept so the UI can show
-    # actuals while charting comparables.
     g["complete_year"] = g.months >= 12
     g["annualise"] = 12 / g.months.clip(lower=1)
     for col in ["nrw_m3", "production_m3", "billed_m3", "physical_loss_m3",
@@ -184,31 +177,24 @@ def plant_year(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # --------------------------------------------------------------------------
-# 5. Leakage Intervention Priority Score
+# 5. Leakage Intervention Priority Score (Revised 4-Factor LIPS)
 # --------------------------------------------------------------------------
 
-# LIPS ranks plants by the water a repair would actually recover, and by
-# nothing else. Every non-volume term was removed:
-#   nrw_pct            a ratio, not a quantity of water
-#   bursts_per_100km   a count of events, not water
-#   asset_age_index    a condition proxy, not water
-#   physical_share_pct already inside physical_loss_m3 by construction
-#                      (physical_loss = nrw x share / 100), so weighting it
-#                      separately double-counted it
-# The old six-component score put 33.9% of recoverable water in its top ten;
-# ranking on volume alone puts 64.0% there.
+# Updated weights configuration:
+#   nrw_per_km_m3 (40%)    : Combined Loss Density (NRW volume concentration)
+#   bursts_per_100km (25%) : Burst Rate (Proxy for physical pipe failure)
+#   plant_age_yr (20%)     : Asset Condition / Deterioration risk
+#   account_density (15%)  : Commercial & Metering risk exposure
 DEFAULT_WEIGHTS = {
-    "physical_loss_m3": 100,       # m3 a repair physically recovers
+    "nrw_per_km_m3": 40,
+    "bursts_per_100km": 25,
+    "plant_age_yr": 20,
+    "account_density": 15,
 }
 
 
 def percentile_rank(s: pd.Series) -> pd.Series:
-    """0-100 percentile rank, so the score stays on a readable scale.
-
-    Chosen over min-max because plant size is heavily right-skewed: min-max
-    would let the single largest plant compress all others into the bottom
-    decile. Being monotone, it leaves the ranking identical to a straight sort
-    on the underlying volume."""
+    """0-100 percentile rank to maintain readable scaling without outlier distortion."""
     return s.rank(pct=True, method="average") * 100
 
 
@@ -217,15 +203,16 @@ def lips(g: pd.DataFrame, weights: dict = None) -> pd.DataFrame:
     total = sum(weights.values())
     out = g.copy()
     score = pd.Series(0.0, index=out.index)
+    
     for col, w in weights.items():
         comp = percentile_rank(out[col])
         out[f"pr_{col}"] = comp
         score += comp * (w / total)
+        
     out["lips"] = score.round(2)
-    # A repair queue must be a strict order: two plants cannot both be
-    # "priority 31". Ties on LIPS are broken by physical loss volume, so the
-    # plant with more recoverable water is visited first.
-    out = out.sort_values(["lips", "physical_loss_m3"], ascending=False)
+    
+    # Tie-breaking priority: LIPS Score -> NRW Loss Density -> Raw NRW Volume
+    out = out.sort_values(["lips", "nrw_per_km_m3", "nrw_m3"], ascending=False)
     out["lips_rank"] = np.arange(1, len(out) + 1)
     out["volume_rank"] = out["nrw_m3"].rank(ascending=False, method="first").astype(int)
     out["rate_rank"] = out["nrw_pct"].rank(ascending=False, method="first").astype(int)
