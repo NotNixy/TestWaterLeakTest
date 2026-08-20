@@ -834,14 +834,14 @@ with TAB_RATEVOL:
    with _sub[0]:
      st.markdown("#### Two measures, two different repair queues")
 
-      rho = spearmanr(sel.nrw_pct, sel.nrw_m3).statistic
-      tau = kendalltau(sel.rate_rank, sel.volume_rank).statistic
-      n_top = min(10, n_plants)
-      top_rate = sel.nsmallest(n_top, "rate_rank")
-      top_vol = sel.nsmallest(n_top, "volume_rank")
-      overlap = len(set(top_rate.plant) & set(top_vol.plant))
-      w_rate, w_vol = top_rate.nrw_m3.sum(), top_vol.nrw_m3.sum()
-      ratio = w_vol / w_rate if w_rate else np.nan
+    rho = spearmanr(sel.nrw_pct, sel.nrw_m3).statistic
+    tau = kendalltau(sel.rate_rank, sel.volume_rank).statistic
+     n_top = min(10, n_plants)
+     top_rate = sel.nsmallest(n_top, "rate_rank")
+     top_vol = sel.nsmallest(n_top, "volume_rank")
+     overlap = len(set(top_rate.plant) & set(top_vol.plant))
+     w_rate, w_vol = top_rate.nrw_m3.sum(), top_vol.nrw_m3.sum()
+    ratio = w_vol / w_rate if w_rate else np.nan
 
       st.markdown(T.callout(
         f"Ranking the same {n_plants} plants by loss <b>rate</b> and by loss "
