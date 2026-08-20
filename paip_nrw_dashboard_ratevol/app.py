@@ -370,7 +370,7 @@ tabs = st.tabs(["Overview", "Loss Dynamic", "Burst Risk", "Plant Profile"])
 # ==========================================================================
 
 with TAB_OVERVIEW:
-    _sub = st.tabs(["Ranking", "Recovery curve", "Full schedule"])
+    _sub = st.tabs(["Ranking","Full schedule","Recovery curve"])
     with _sub[0]:
         st.markdown("#### Leakage Intervention Priority Score (4-Factor LIPS)")
         st.markdown(T.callout(
@@ -426,7 +426,7 @@ with TAB_OVERVIEW:
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
 
-    with _sub[1]:
+    with _sub[2]:
         st.markdown("#### Recovery curve — how far a crew programme gets")
 
         order_lips = sel.sort_values("lips_rank")
@@ -452,7 +452,7 @@ with TAB_OVERVIEW:
                         range=[0, 102]))
         st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
 
-    with _sub[2]:
+    with _sub[1]:
         st.markdown("#### Full intervention schedule")
         sched = sel.sort_values("lips_rank")[
             ["lips_rank", "plant", "district", "area_type", "lips",
@@ -945,11 +945,6 @@ with TAB_RATEVOL:
                            range=[0, n_plants + 5]),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
-            st.markdown(
-                '<div class="caption">Each row is one plant; the bar spans the two '
-                'rankings. Long bars are plants the rate ranking buries — large, '
-                'apparently acceptable performers that quietly lose the most '
-                'water.</div>', unsafe_allow_html=True)
 
     with _sub[1]:
         st.markdown("#### Physical leakage versus commercial loss")
