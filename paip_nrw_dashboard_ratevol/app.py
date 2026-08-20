@@ -905,12 +905,6 @@ with TAB_RATEVOL:
                            dtick=1, minor=dict(showgrid=False)),
                 yaxis=dict(title="Loss rate (% of production)", ticksuffix="%"))
             st.plotly_chart(fig, width='stretch', config=PLOT_CFG, theme=None)
-            st.markdown(
-                '<div class="caption">The orange plants post the alarming '
-                'percentages; the blue plants hold the water. They are almost '
-                'entirely different sets, because a percentage is a ratio to plant '
-                'size — small plants reach extreme rates on modest volumes.</div>',
-                unsafe_allow_html=True)
 
         with c2:
             st.markdown("###### How far plants move between the two rankings")
