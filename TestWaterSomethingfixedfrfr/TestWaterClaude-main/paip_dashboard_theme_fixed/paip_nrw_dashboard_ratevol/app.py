@@ -252,25 +252,18 @@ def rm(n):
 # "Overview" is the single-screen summary; everything under it is the same
 # material at full size with the reasoning attached.
 NAV = [
-    ("OVERVIEW", [("Command centre", "cmd")]),
+    ("OVERVIEW", [("At a glance", "cmd")]),
     ("PRIORITY", [("Ranking", "rank"),
                   ("Full schedule", "sched"),
                   ("Recovery curve", "curve")]),
     ("LOSS DYNAMIC", [("Rate vs volume", "ratevol"),
                       ("Loss composition", "comp")]),
-    ("BURST RISK", [("Risk ranking", "brisk"),
-                    ("Performance", "bperf"),
-                    ("Model evidence", "bevid"),
-                    ("Validation", "bval"),
-                    ("Register", "breg"),
-                    ("Limitations", "blim")]),
     ("PLANT PROFILE", [("Summary", "psum"),
                        ("What the model sees", "pmodel"),
                        ("History", "phist")]),
 ]
 SEC_PRIORITY = {"rank", "sched", "curve"}
 SEC_LOSS = {"ratevol", "comp"}
-SEC_BURST = {"brisk", "bperf", "bevid", "bval", "breg", "blim"}
 SEC_PLANT = {"psum", "pmodel", "phist"}
 
 if "view" not in st.session_state:
@@ -452,12 +445,6 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("Value forgone", f"RM {rm(tot_val)}", f"across {n_plants} plants"),
-    ("Above 25% target", f"{above} of {n_plants}",
-     f"{above/n_plants*100:.0f}% of the estate"),
-    ("Top-10 priority", f"{_top10_share:.0f}%",
-     f"of all NRW, in 10 plants" if not _flagged
-     else f"of all NRW · {_flagged} burst-flagged"),
 ]
 _cells = "".join(
     f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>{l}</div>'
@@ -486,7 +473,7 @@ def mini(fig, h=214, ylab=None, xlab=None, legend=False):
 
 
 # ==========================================================================
-# TAB 0 — Command screen
+# Overview tab
 # ==========================================================================
 if VIEW == "cmd":
     # Nine cards, but deliberately NOT a uniform 3x3. Column widths vary and
@@ -702,10 +689,13 @@ if VIEW == "cmd":
             f.update_yaxes(showgrid=False)
             chart(mini(f, h=196))
 
+# ====================================================================
+# Priority Tab
+# ====================================================================
 
 if VIEW in SEC_PRIORITY:
     if VIEW == "rank":
-        st.markdown("#### Leakage Intervention Priority Score (4-Factor LIPS)")
+        st.markdown("### Leakage Intervention Priority Score (4-Factor LIPS)")
         st.markdown(T.callout(
             "LIPS prioritizes intervention by combining four operational indicators into a balanced 0–100 score:<br>"
             "• <b>Loss Density (40%)</b>: Concentration of NRW volume per kilometer of pipe.<br>"
@@ -731,7 +721,7 @@ if VIEW in SEC_PRIORITY:
                                "Loss Density: %{customdata[1]:,.0f} m³/km<br>"
                                "Burst Rate: %{customdata[2]:.1f} /100km<extra></extra>")))
             fig.update_layout(
-                title=f"Top {n_show} Plants by LIPS Priority", height=572,
+                title=f"<b>Top {n_show} Plants by LIPS Priority</b>", height=572,
                 bargap=0.3,
                 xaxis=dict(title="LIPS Score (0–100)", range=[0, 115]),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
@@ -756,14 +746,14 @@ if VIEW in SEC_PRIORITY:
                                        "percentile %{x:.0f}<extra></extra>")
                     ))
             fig.update_layout(
-                title="LIPS Component Percentile Profile",
+                title="<b>LIPS Component Percentile Profile</b>",
                 height=572, barmode="stack", bargap=0.3,
                 xaxis=dict(title="Weighted Component Contribution"),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             chart(fig)
 
     if VIEW == "curve":
-        st.markdown("#### Recovery curve — how far a crew programme gets")
+        st.markdown("### Recovery curve — how far a crew programme gets")
 
         order_lips = sel.sort_values("lips_rank")
         order_rate = sel.sort_values("rate_rank")
@@ -789,7 +779,7 @@ if VIEW in SEC_PRIORITY:
         chart(fig)
 
     if VIEW == "sched":
-        st.markdown("#### Full intervention schedule")
+        st.markdown("### Full intervention schedule")
         sched = sel.sort_values("lips_rank")[
             ["lips_rank", "plant", "district", "area_type", "lips",
              "nrw_per_km_m3", "bursts_per_100km", "plant_age_yr", "account_density",
@@ -811,349 +801,9 @@ if VIEW in SEC_PRIORITY:
         st.download_button("Download schedule (CSV)", sched.to_csv(index=False),
                            f"paip_lips_schedule_{year}.csv", "text/csv")
 
-if VIEW in SEC_BURST:
-    if not HAS_BURST:
-        st.warning("Burst-risk artefacts not found. Run "
-                   "`python train_burst_model.py`, then reload.")
-        st.stop()
-
-    bm = burst_metrics
-    BURST_MIN = bm["target"].split(">= ")[-1]
-    res = bm["results"]
-    best = bm["selected_model"]
-    cmx = bm["confusion_matrix"]
-    tp, fp, fn, tn = cmx["tp"], cmx["fp"], cmx["fn"], cmx["tn"]
-    prec = tp / max(tp + fp, 1)
-    rec = tp / max(tp + fn, 1)
-    NAMES = {"majority": "Majority class", "persistence": "Persistence rule",
-             "logistic": "Logistic regression", "forest": "Random forest",
-             "boosting": "Gradient boosting"}
-
-    # Sub-tab strip replaced by the sidebar nav.
-    if VIEW == "brisk":
-
-        st.markdown(f"#### Which plants will suffer bursts next month? · {bm['horizon']}")
-        k = st.columns(5)
-        k[0].markdown(T.tile("Discrimination", f"{res[best]['test_roc_auc']:.3f}", "AUC",
-                             f"{NAMES[best]} on 6 unseen months"), unsafe_allow_html=True)
-        k[1].markdown(T.tile("Precision", f"{prec*100:.0f}", "%",
-                             f"Of plants flagged, {prec*100:.0f}% did have an elevated month"),
-                      unsafe_allow_html=True)
-        k[2].markdown(T.tile("Recall", f"{rec*100:.0f}", "%",
-                             f"Of elevated months that occurred, {rec*100:.0f}% were caught"),
-                      unsafe_allow_html=True)
-        k[3].markdown(T.tile("Beats persistence by",
-                             f"+{(res[best]['test_roc_auc']-res['persistence']['test_roc_auc'])*100:.0f}",
-                             "pts AUC",
-                             f"Naive rule scores {res['persistence']['test_roc_auc']:.3f}"),
-                      unsafe_allow_html=True)
-        k[4].markdown(T.tile("Flagged next month", f"{bm['n_flagged']}",
-                             f"of {len(burst_pred)}",
-                             f"At the {bm['operating_threshold']:.2f} decision threshold"),
-                      unsafe_allow_html=True)
-
-        st.markdown("")
-        c1, c2 = st.columns([1.55, 1])
-
-        with c1:
-            st.markdown("###### Ranked risk for next month")
-            bp = burst_pred.copy()
-            if len(districts) < yearly.district.nunique():
-                bp = bp[bp.district.isin(districts)]
-            n_show = min(16, len(bp))
-            top = bp.nsmallest(n_show, "risk_rank").sort_values("risk_pct")
-            BAND_COLOR = {"Critical": T.CRITICAL, "High": T.SERIOUS,
-                          "Moderate": T.WARNING, "Low": T.GOOD}
-            fig = go.Figure(go.Bar(
-                x=top.risk_pct, y=top.plant, orientation="h",
-                marker=dict(color=[BAND_COLOR.get(b, T.BLUE) for b in top.risk_band],
-                            line=dict(color=T.SURFACE, width=2)),
-                text=[f"{v:.0f}%  {b}" for v, b in zip(top.risk_pct, top.risk_band)],
-                textposition="outside", textfont=dict(size=10.5, color=T.INK_2),
-                customdata=np.stack([top.district, top.pipe_bursts,
-                                     top.bursts_roll3, top.risk_rank], -1),
-                hovertemplate=("<b>%{y}</b> · %{customdata[0]}<br>"
-                               "Risk  %{x:.1f}%  (rank %{customdata[3]})<br>"
-                               "Bursts this month  %{customdata[1]:.0f}<br>"
-                               "3-month average  %{customdata[2]:.1f}"
-                               "<extra></extra>")))
-            fig.add_vline(x=bm["operating_threshold"] * 100,
-                          line=dict(color=T.BASELINE, width=1.5, dash="dash"),
-                          annotation_text="dispatch threshold",
-                          annotation_position="top",
-                          annotation_font=dict(size=10.5, color=T.MUTED))
-            fig.update_layout(
-                title=f"Probability of an elevated-burst month · {bm['horizon']}",
-                height=520, bargap=0.3,
-                xaxis=dict(title="Predicted probability (%)", range=[0, 118]),
-                yaxis=dict(title=None, tickfont=dict(size=11)))
-            chart(fig)
-            st.markdown(
-                '<div class="caption">Every bar names its band, so the ranking '
-                'never depends on colour alone.</div>', unsafe_allow_html=True)
-
-        with c2:
-            st.markdown("###### How to read this")
-            st.markdown(
-                f'<div class="caption">A supervised classifier trained on a '
-                f'<b>real outcome</b> — the burst count PAIP already records. '
-                f'Features come from month <i>t</i>, the label from <i>t+1</i>, '
-                f'so it predicts a future event and can be scored against '
-                f'whether it happened.<br><br>The target is an <b>elevated '
-                f'month ({BURST_MIN}+ bursts)</b>, not "any burst": 98.1% of '
-                f'plant-months already record at least one, so "any burst" is a '
-                f'constant rather than a prediction. Elevated months occur in '
-                f'{bm["positive_rate"]:.1%} of cases.<br><br>Bars past the '
-                f'dashed line are the plants the model would dispatch a crew '
-                f'to. See <b>Performance</b> for how well it did on months it '
-                f'never saw.</div>', unsafe_allow_html=True)
-
-    if VIEW == "bperf":
-        st.markdown("###### Was it right? Last 6 months, held out")
-        c1, c2 = st.columns(2)
-        with c1:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=bm["roc_curve"]["fpr"], y=bm["roc_curve"]["tpr"], mode="lines",
-                name=f"{NAMES[best]} (AUC {res[best]['test_roc_auc']:.3f})",
-                line=dict(color=T.BLUE, width=2.5), fill="tozeroy",
-                fillcolor=T.TILE_WASH,
-                hovertemplate=("False positive rate  %{x:.2f}<br>"
-                               "True positive rate  %{y:.2f}<extra></extra>")))
-            fig.add_trace(go.Scatter(
-                x=[0, 1], y=[0, 1], mode="lines", name="Random guessing",
-                line=dict(color=T.MUTED, width=1.5, dash="dash"), hoverinfo="skip"))
-            fig.update_layout(
-                title="ROC curve", height=610,
-                xaxis=dict(title="False positive rate", range=[0, 1]),
-                yaxis=dict(title="True positive rate", range=[0, 1.02]))
-            chart(fig)
-
-        with c2:
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=bm["pr_curve"]["recall"], y=bm["pr_curve"]["precision"],
-                mode="lines", name=f"Model (PR-AUC {res[best]['test_pr_auc']:.3f})",
-                line=dict(color=T.BLUE, width=2.5),
-                hovertemplate="Recall  %{x:.2f}<br>Precision  %{y:.2f}<extra></extra>"))
-            fig.add_hline(y=bm["positive_rate"],
-                          line=dict(color=T.MUTED, width=1.5, dash="dash"),
-                          annotation_text=f"base rate {bm['positive_rate']:.0%}",
-                          annotation_position="bottom right",
-                          annotation_font=dict(size=10.5, color=T.MUTED))
-            fig.update_layout(
-                title="Precision–recall curve", height=610,
-                xaxis=dict(title="Recall", range=[0, 1]),
-                yaxis=dict(title="Precision", range=[0, 1.02]))
-            chart(fig)
-            st.markdown(
-                f'<div class="caption">Precision–recall is the honest curve when '
-                f'classes are uneven: a model that flagged everything would sit at '
-                f'the dashed base rate of {bm["positive_rate"]:.0%}.</div>',
-                unsafe_allow_html=True)
-
-    if VIEW == "bevid":
-        st.markdown("#### Model evidence")
-        c3, c4, c5 = st.columns([1, 1, 1])
-
-        with c3:
-            st.markdown("###### Confusion matrix")
-            z = [[tn, fp], [fn, tp]]
-            labels = [["True negative", "False positive"],
-                      ["False negative", "True positive"]]
-            fig = go.Figure(go.Heatmap(
-                z=z, x=["Predicted quiet", "Predicted elevated"],
-                y=["Actually quiet", "Actually elevated"],
-                colorscale=T.SEQ, showscale=False,
-                text=[[f"{labels[i][j]}<br><b>{z[i][j]}</b>" for j in range(2)]
-                      for i in range(2)],
-                texttemplate="%{text}", textfont=dict(size=13),
-                hovertemplate="%{y} · %{x}<br>%{z} cases<extra></extra>"))
-            fig.update_layout(title=f"At threshold {bm['operating_threshold']:.2f}",
-                              height=560, xaxis=dict(side="bottom"),
-                              yaxis=dict(autorange="reversed"))
-            chart(fig)
-            st.markdown(
-                f'<div class="caption">{fp} false alarms cost a wasted inspection; '
-                f'{fn} misses cost an unanticipated burst. The threshold was tuned '
-                f'on training data to favour recall — missing a burst is the more '
-                f'expensive error.</div>', unsafe_allow_html=True)
-
-        with c4:
-            st.markdown("###### Are the probabilities honest?")
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=[0, 1], y=[0, 1], mode="lines", name="Perfect calibration",
-                line=dict(color=T.MUTED, width=1.5, dash="dash"), hoverinfo="skip"))
-            fig.add_trace(go.Scatter(
-                x=bm["calibration"]["predicted"], y=bm["calibration"]["observed"],
-                mode="lines+markers", name="Observed",
-                line=dict(color=T.BLUE, width=2.5),
-                marker=dict(size=9, color=T.BLUE,
-                            line=dict(color=T.SURFACE, width=2)),
-                hovertemplate=("Predicted  %{x:.0%}<br>Actually happened  %{y:.0%}"
-                               "<extra></extra>")))
-            fig.update_layout(
-                title="Calibration", height=560,
-                xaxis=dict(title="Predicted probability", range=[0, 1], tickformat=".0%"),
-                yaxis=dict(title="Observed frequency", range=[0, 1], tickformat=".0%"))
-            chart(fig)
-            st.markdown(
-                f'<div class="caption">The points sit on the diagonal, so a stated '
-                f'80% really does mean roughly 80%. Brier score '
-                f'<b>{res[best]["brier"]:.3f}</b>. This is what makes the risk '
-                f'percentages usable as probabilities rather than just a ranking.'
-                f'</div>', unsafe_allow_html=True)
-
-        with c5:
-            st.markdown("###### What the model relies on")
-            gi = pd.DataFrame(bm["grouped_importances"]).sort_values("importance")
-            fig = go.Figure(go.Bar(
-                x=gi.importance, y=gi.group, orientation="h",
-                error_x=dict(type="data", array=gi["std"], color=T.MUTED,
-                             thickness=1, width=3),
-                marker=dict(color=T.BLUE, line=dict(color=T.SURFACE, width=2)),
-                customdata=gi.n_features,
-                hovertemplate=("<b>%{y}</b><br>AUC drop  %{x:.4f}<br>"
-                               "%{customdata} features<extra></extra>")))
-            fig.add_vline(x=0, line=dict(color=T.BASELINE, width=1.5))
-            fig.update_layout(
-                title="Grouped permutation importance", height=560,
-                xaxis=dict(title="Drop in AUC when the group is shuffled"),
-                yaxis=dict(title=None, tickfont=dict(size=10.5)))
-            chart(fig)
-            st.markdown(
-                '<div class="caption">Whole families are shuffled together. '
-                'Shuffling one burst-history column alone proves nothing — six '
-                'others carry the same information and cover for it, which is how '
-                'a single-feature ranking put <i>calendar month</i> on top despite '
-                'the elevated-burst rate varying only between 35% and 47% across '
-                'the year.</div>', unsafe_allow_html=True)
-
-    if VIEW == "bval":
-        c6, c7 = st.columns([1, 1])
-        with c6:
-            st.markdown("###### Every model tested")
-            rows = []
-            for kind in ["majority", "persistence", "logistic", "forest", "boosting"]:
-                r = res[kind]
-                rows.append({
-                    "Model": NAMES[kind] + ("  ✓ selected" if kind == best else ""),
-                    "CV AUC": r.get("cv_roc_auc", float("nan")),
-                    "Test AUC": r["test_roc_auc"],
-                    "PR-AUC": r["test_pr_auc"],
-                    "F1": r["test_f1"],
-                    "Brier": r["brier"]})
-            st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True,
-                         column_config={
-                             "CV AUC": st.column_config.NumberColumn(format="%.3f"),
-                             "Test AUC": st.column_config.NumberColumn(format="%.3f"),
-                             "PR-AUC": st.column_config.NumberColumn(format="%.3f"),
-                             "F1": st.column_config.NumberColumn(format="%.3f"),
-                             "Brier": st.column_config.NumberColumn(format="%.3f")})
-            st.markdown(f"""
-    <div class="caption">
-
-    <b>Two baselines, both beaten.</b> <i>Majority class</i> predicts "quiet" for
-    everyone and scores AUC 0.500 — the floor. <i>Persistence</i> is the rule a
-    planner would use without any model: "next month looks like this month". It
-    reaches {res['persistence']['test_roc_auc']:.3f}, which is genuinely
-    informative — so the model has to beat that, not just beat chance. It does, by
-    {(res[best]['test_roc_auc']-res['persistence']['test_roc_auc'])*100:.0f} AUC
-    points.
-
-    <b>Selected on cross-validation, reported on a held-out window.</b> The winner
-    was chosen by expanding-window CV inside the training period; the final six
-    months were never used to pick the model, only to report it.
-
-    </div>""", unsafe_allow_html=True)
-
-        with c7:
-            st.markdown("###### How it was validated")
-            st.markdown(f"""
-    <div class="caption">
-
-    <b>Splits are chronological, never random.</b> Every fold trains strictly on
-    months that precede the ones it is scored on. A random split would let the model
-    see {YEAR_MAX} while predicting {YEAR_MIN}, which inflates every metric.
-
-    <b>Note this differs from the expected-loss model deliberately.</b> That one
-    grouped by plant, because the question was "does this work on a plant we have
-    never seen". Here the plants are fixed and known, and the question is "does this
-    work on a month that has not happened yet" — so time, not plant, is what must be
-    held out.
-
-    <b>No leakage.</b> Features come from month <i>t</i>; the label is month
-    <i>t+1</i>. Rolling windows look only backwards. `shift(-1)` appears once in the
-    whole module, on the target.
-
-    <b>The threshold was tuned on training data</b> ({bm['operating_threshold']:.3f},
-    maximising F1). Tuning it on the test window would make the precision and recall
-    above flattering rather than honest.
-
-    <b>Train</b> {bm['n_train']:,} rows to {bm['train_end']} ·
-    <b>Test</b> {bm['n_test']:,} rows over {bm['test_months']} months ·
-    <b>Base rate</b> {bm['positive_rate']:.1%}
-
-    </div>""", unsafe_allow_html=True)
-
-    if VIEW == "breg":
-        st.markdown("#### Full risk register")
-        reg = burst_pred.sort_values("risk_rank")[
-            ["risk_rank", "plant", "district", "area_type", "risk_pct", "risk_band",
-             "pipe_bursts", "bursts_roll3", "bursts_per_100km", "elevated_share6",
-             "plant_age_yr", "pipe_length_km", "nrw_pct"]]
-        st.dataframe(
-            reg, width='stretch', hide_index=True, height=560,
-            column_config={
-                "risk_rank": st.column_config.NumberColumn("#", width="small"),
-                "plant": "Plant", "district": "District", "area_type": "Area",
-                "risk_pct": st.column_config.ProgressColumn(
-                    "Risk", min_value=0, max_value=100, format="%.1f%%"),
-                "risk_band": "Band",
-                "pipe_bursts": st.column_config.NumberColumn("Bursts now"),
-                "bursts_roll3": st.column_config.NumberColumn("3-mo avg", format="%.1f"),
-                "bursts_per_100km": st.column_config.NumberColumn("Per 100km", format="%.1f"),
-                "elevated_share6": st.column_config.NumberColumn("Elevated 6mo", format="%.2f"),
-                "plant_age_yr": st.column_config.NumberColumn("Age yr", format="%.0f"),
-                "pipe_length_km": st.column_config.NumberColumn("Network km", format="%.0f"),
-                "nrw_pct": st.column_config.NumberColumn("NRW", format="%.1f%%")})
-        st.download_button("Download risk register (CSV)", reg.to_csv(index=False),
-                           f"paip_burst_risk_{bm['horizon'].replace(' ', '_')}.csv",
-                           "text/csv")
-
-    if VIEW == "blim":
-        st.markdown("#### Limitations")
-        st.markdown(f"""
-<div class="caption">
-
-<b>It predicts one month ahead, not a specific pipe.</b> The unit is the plant,
-so the output says "this plant is likely to see multiple bursts next month" —
-not where on the network, and not when in the month.
-
-<b>Burst counts are a reporting artefact as well as a physical one.</b> A plant
-with more staff or better reporting records more bursts. The model partly learns
-reporting behaviour, and no field in this dataset can separate the two.
-
-<b>Structure beats history here — which is worth knowing.</b> Grouped importance
-puts asset condition and network shape well above burst history. Recent bursts
-do predict (the persistence rule reaches
-{res['persistence']['test_roc_auc']:.2f} on its own), but once the model knows a
-plant is large, old and long-networked, last month's count adds little. Burst
-risk on this estate is mostly <i>structural</i>.
-
-<b>One month of horizon, {bm['test_months']} months of test data.</b> A longer
-horizon would need re-training and would almost certainly score worse.
-
-<b>The dataset appears synthetic</b> — every published identity holds to the
-rounding digit — so these relationships may be partly manufactured. The method
-transfers to real PAIP data; the exact AUC may not.
-
-</div>""", unsafe_allow_html=True)
-
 
 # ==========================================================================
-# TAB 2 — Loss Dynamic (rate vs volume, then loss composition)
+# Loss Dynamic (rate vs volume, then loss composition) tab
 # ==========================================================================
 
 if VIEW in SEC_LOSS:
@@ -1163,7 +813,7 @@ if VIEW in SEC_LOSS:
     # rankings, and the full ordering is downloadable from the Priority
     # Schedule.
     if VIEW == "ratevol":
-        st.markdown("#### Two measures, two different repair queues")
+        st.markdown("### Two measures, two different repair queues")
 
         rho = spearmanr(sel.nrw_pct, sel.nrw_m3).statistic
         tau = kendalltau(sel.rate_rank, sel.volume_rank).statistic
@@ -1280,7 +930,7 @@ if VIEW in SEC_LOSS:
             chart(fig)
 
     if VIEW == "comp":
-        st.markdown("#### Physical leakage versus commercial loss")
+        st.markdown("### Physical leakage versus commercial loss")
         st.markdown(T.callout(
             "Physical (real) losses are water escaping the network — pipe repair "
             "and pressure management recover them. Commercial (apparent) losses are "
@@ -1318,11 +968,11 @@ if VIEW in SEC_LOSS:
 
 
 # ==========================================================================
-# TAB 4 — Plant Profile
+# Plant Profile tab
 # ==========================================================================
 
 if VIEW in SEC_PLANT:
-    st.markdown("#### Plant profile")
+    st.markdown("### Plant profile")
     plant_list = sel.sort_values("lips_rank").plant.tolist()
     c0a, c0b = st.columns([1, 2])
     with c0a:
@@ -1442,7 +1092,7 @@ if VIEW in SEC_PLANT:
             st.info(f"No model output for {plant} in {year}. The expected-loss "
                     f"model is fitted for {ML_YEAR}.")
         else:
-            st.markdown("###### What the model sees at this plant")
+            st.markdown("#### What the model sees at this plant")
             pm_ml = ml_monthly[ml_monthly.plant == plant].sort_values("date")
             c7, c8 = st.columns([1.5, 1])
             with c7:
