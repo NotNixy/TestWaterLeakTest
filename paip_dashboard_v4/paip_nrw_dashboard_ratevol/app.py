@@ -703,7 +703,8 @@ if VIEW in SEC_PRIORITY:
 
     if VIEW == "curve":
         st.markdown("### Recovery curve — how far a crew programme gets")
-        st.markdown('<div class="caption">📊 <b>Efficiency</b></div>',
+        st.markdown('<div class="caption">📊 Shows how fast the queue order '
+                    'recovers total water loss as more plants are visited.</div>',
                     unsafe_allow_html=True)
 
         order_lips = sel.sort_values("lips_rank")
@@ -830,7 +831,8 @@ if VIEW in SEC_LOSS:
                            dtick=1, minor=dict(showgrid=False)),
                 yaxis=dict(title="Loss rate (% of production)", ticksuffix="%"))
             chart(fig)
-            st.markdown('<div class="caption">📊 <b>Divergence</b></div>',
+            st.markdown('<div class="caption">📊 Shows where a plant\'s loss rate '
+                        'and total loss volume disagree, sized by water lost.</div>',
                         unsafe_allow_html=True)
 
         with c2:
@@ -869,7 +871,8 @@ if VIEW in SEC_LOSS:
                            range=[0, n_plants + 5]),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             chart(fig)
-            st.markdown('<div class="caption">📊 <b>Reshuffle</b></div>',
+            st.markdown('<div class="caption">📊 Shows how much each plant\'s '
+                        'rank shifts between the rate ranking and the volume ranking.</div>',
                         unsafe_allow_html=True)
 
     if VIEW == "comp":
@@ -904,7 +907,8 @@ if VIEW in SEC_LOSS:
                 xaxis=dict(title="Volume lost (m³)"),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             chart(fig)
-            st.markdown('<div class="caption">📊 <b>Breakdown</b></div>',
+            st.markdown('<div class="caption">📊 Splits each plant\'s water loss '
+                        'into physical leaks and commercial (billing) losses.</div>',
                         unsafe_allow_html=True)
 
 
