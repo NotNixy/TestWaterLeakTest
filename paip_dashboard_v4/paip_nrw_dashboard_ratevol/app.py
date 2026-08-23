@@ -47,7 +47,8 @@ _pref = st.session_state.get("appearance", "Light")
 MODE = theme_mod.resolve_mode(_pref, _detected)
 T = theme_mod.Theme(MODE)
 st.markdown(T.css, unsafe_allow_html=True)
-st.markdown("<style>.card-t { font-weight: 700 !important; }</style>",
+st.markdown("<style>.card-t { font-weight: 700 !important; } "
+            ".kpi-l { font-weight: 700 !important; }</style>",
             unsafe_allow_html=True)
 
 PLOT_CFG = {"displayModeBar": False, "responsive": True}
@@ -422,7 +423,8 @@ _kpis = [
     ("LIPS interquartile range", f"{lips_iqr:.1f}", f"Q1 {lips_q1:.1f} – Q3 {lips_q3:.1f}"),
 ]
 _cells = "".join(
-    f'<div class="kpi"><div class="kpi-l"><span class="drop"></span><b>{l}</b></div>'
+    f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>'
+    f'<span style="font-weight:700 !important">{l}</span></div>'
     f'<div class="kpi-v">{v}</div><div class="kpi-s">{s_}</div></div>'
     for l, v, s_ in _kpis)
 st.markdown(f'<div class="kpistrip">{_cells}</div>', unsafe_allow_html=True)
