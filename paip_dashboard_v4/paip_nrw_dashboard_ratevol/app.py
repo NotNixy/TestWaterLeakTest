@@ -920,59 +920,84 @@ if VIEW in SEC_LOSS:
 if VIEW in SEC_PLANT:
     st.markdown("### Plant profile")
     plant_list = sel.sort_values("lips_rank").plant.tolist()
-    c0a, c0b = st.columns([1, 2])
-    with c0a:
-        plant = st.selectbox("Plant", plant_list, index=0)
-    p = sel[sel.plant == plant].iloc[0]
-    pm = msel[msel.plant == plant].sort_values("date")
-    hist = monthly[monthly.plant == plant].sort_values("date")
+    if VIEW == "pcomp":
+        # 1. Define top row columns matching both selectboxes and captions
+        c0a, c0b = st.columns(2)
+    
+        with c0a:
+            plant = st.selectbox("Plant", plant_list, index=0)
+            p = sel[sel.plant == plant].iloc[0]
+            pm = msel[msel.plant == plant].sort_values("date")
+            hist = monthly[monthly.plant == plant].sort_values("date")
+            st.markdown(
+                f'<div class="caption" style="padding-top:10px;">'
+                f'<b>{plant}</b> · {p.district} · {p.area_type}<br>'
+                f'{p.plant_age_yr:.0f}-year-old plant · '
+                f'{p.pipe_length_km:,.0f} km of main · '
+                f'{p.customer_accounts:,.0f} connections · '
+                f'{p.population_served:,.0f} people served</div>',
+                unsafe_allow_html=True)
 
-    with c0b:
-        st.markdown(
-            f'<div class="caption" style="padding-top:30px">'
-            f'<b>{plant}</b> · {p.district} · {p.area_type} · '
-            f'{p.plant_age_yr:.0f}-year-old plant · '
-            f'{p.pipe_length_km:,.0f} km of main · '
-            f'{p.customer_accounts:,.0f} connections · '
-            f'{p.population_served:,.0f} people served</div>',
-            unsafe_allow_html=True)
+        with c0b:
+            other_plants = [p_item for p_item in plant_list if p_item != plant]
+
+            # Making sure that Plant 2 stays when Plant 1 changes
+            saved_p2 = st.session_state.get("p2_name")
+            p2_idx = other_plants.index(saved_p2) if saved_p2 in other_plants else 0
+
+            p2_name = st.selectbox("Compare with", other_plants, index=p2_idx, key="p2_name")
+        
+            p2 = sel[sel.plant == p2_name].iloc[0]
+            hist2 = monthly[monthly.plant == p2_name].sort_values("date")
+
+            st.markdown(
+                f'<div class="caption" style="padding-top:10px;">'
+                f'<b>{p2_name}</b> · {p2.district} · {p2.area_type}<br>'
+                f'{p2.plant_age_yr:.0f}-year-old plant · '
+                f'{p2.pipe_length_km:,.0f} km of main · '
+                f'{p2.customer_accounts:,.0f} connections · '
+                f'{p2.population_served:,.0f} people served</div>',
+                unsafe_allow_html=True)
+
+        st.space()
+
+    else:
+        # Standard single-plant layout for psum, pmodel, phist
+        c0a, c0b = st.columns([1, 2])
+        with c0a:
+            plant = st.selectbox("Plant", plant_list, index=0)
+            p = sel[sel.plant == plant].iloc[0]
+            pm = msel[msel.plant == plant].sort_values("date")
+            hist = monthly[monthly.plant == plant].sort_values("date")
+        with c0b:
+            st.markdown(
+                f'<div class="caption" style="padding-top:39px">'
+                f'<b>{plant}</b> · {p.district} · {p.area_type} · '
+                f'{p.plant_age_yr:.0f}-year-old plant · '
+                f'{p.pipe_length_km:,.0f} km of main · '
+                f'{p.customer_accounts:,.0f} connections · '
+                f'{p.population_served:,.0f} people served</div>',
+                unsafe_allow_html=True)
+        
+        st.space()
+    
+    st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
+
+    # Calculate fleet median dynamically
+    burst_med = sel.bursts_per_100km.median()
+    burst_ratio = p.bursts_per_100km / burst_med if burst_med else 1.0
 
     if VIEW == "psum":
-        k = st.columns(5)
-        k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}",
-                             f"of {n_plants} plants in the current selection"),
-                      unsafe_allow_html=True)
-        k[1].markdown(T.tile("Loss rate", f"{p.nrw_pct:.1f}", "%",
-                             f"Rank {p.rate_rank} · system average {sys_pct:.1f}%"),
-                      unsafe_allow_html=True)
-        k[2].markdown(T.tile("Water lost", m3(p.nrw_m3), "m³",
-                             f"Rank {p.volume_rank} · {p.nrw_m3/tot_nrw*100:.1f}% of selection total"),
-                      unsafe_allow_html=True)
-        k[3].markdown(T.tile("Physical share", f"{p.physical_share_pct:.0f}", "%",
-                             f"{m3(p.physical_loss_m3)} m³ addressable by repair"),
-                      unsafe_allow_html=True)
-        k[4].markdown(T.tile("Value at stake", "RM " + rm(p.nrw_value_rm), "",
-                             f"{p.bursts_per_100km:.1f} bursts per 100 km recorded"),
-                      unsafe_allow_html=True)
+        k = st.columns(4)
+        k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
 
-        if HAS_BURST:
-            _b = burst_pred[burst_pred.plant == plant]
-            if len(_b):
-                _b = _b.iloc[0]
-                _band = str(_b.risk_band)
-                _col = {"Critical": T.CRITICAL, "High": T.SERIOUS,
-                        "Moderate": T.WARNING, "Low": T.SUCCESS_TEXT}.get(_band, T.INK)
-                _icon = {"Critical": "▲", "High": "▲", "Moderate": "■",
-                         "Low": "●"}.get(_band, "■")
-                st.markdown(
-                    f'<div class="callout" style="border-left-color:{_col}">'
-                    f'<b>Burst risk for {burst_metrics["horizon"]}: '
-                    f'<span style="color:{_col}">{_icon} {_b.risk_pct:.0f}% · '
-                    f'{_band}</span></b> — ranked {int(_b.risk_rank)} of '
-                    f'{len(burst_pred)} plants, {int(_b.pipe_bursts)} burst(s) last month.</div>',
-                    unsafe_allow_html=True)
+        k[1].markdown(T.tile("Water loss rate", f"{p.nrw_pct:.1f}", "%", f"Rank {p.rate_rank} · system average {sys_pct:.1f}%"), unsafe_allow_html=True)
 
-        st.markdown("")
+        k[2].markdown(T.tile("Water lost", m3(p.nrw_m3), "m³", f"Rank {p.volume_rank} · {p.nrw_m3/tot_nrw*100:.1f}% of selection total"), unsafe_allow_html=True)
+
+        k[3].markdown(T.tile("Burst Rate", f"{p.bursts_per_100km:.1f}", "/100km", f"{burst_ratio:.1f}x fleet median ({burst_med:.1f})"), unsafe_allow_html=True)
+
+        st.space()
         c1, c2 = st.columns([1.4, 1])
         with c1:
             fig = go.Figure()
@@ -992,37 +1017,74 @@ if VIEW in SEC_PLANT:
 
         with c2:
             peer = sel[(sel.area_type == p.area_type)]
-            metrics = [("Loss rate %", "nrw_pct"), ("NRW per km", "nrw_per_km_m3"),
-                       ("Bursts /100km", "bursts_per_100km"),
-                       ("Plant age", "plant_age_yr"), ("Meter age", "meter_age_yr")]
-            labels, pvals, medians = [], [], []
-            for label, col in metrics:
+            metrics = [
+                ("Water loss rate %", "nrw_pct", "%"),
+                ("NRW per km", "nrw_per_km_m3", "m³"),
+                ("Bursts /100km", "bursts_per_100km", "/100km"),
+                ("Plant age", "plant_age_yr", "yrs"),
+                ("Meter age", "meter_age_yr", "yrs")
+            ]
+    
+            labels, pvals, medians, raw_vals, text_labels = [], [], [], [], []
+            for label, col, unit in metrics:
                 med = peer[col].median()
+                val = p[col]
                 if med and not np.isnan(med):
+                    pct = (val / med) * 100
                     labels.append(label)
-                    pvals.append(p[col] / med * 100)
+                    pvals.append(pct)
                     medians.append(med)
+                    raw_vals.append(val)
+                    text_labels.append(f"<b>{val:,.1f} {unit}</b> ({pct:.0f}%)")
+
             fig = go.Figure()
+
+            # Bar Trace
             fig.add_trace(go.Bar(
-                x=pvals, y=labels, orientation="h",
-                marker=dict(color=[T.CRITICAL if v > 130 else
-                                   T.BLUE if v > 70 else T.GOOD for v in pvals],
-                            line=dict(color=T.SURFACE, width=2)),
-                text=[f"{v:.0f}" for v in pvals], textposition="outside",
-                textfont=dict(size=11, color=T.INK_2),
-                customdata=medians,
-                hovertemplate=("<b>%{y}</b><br>%{x:.0f}% of peer median<br>"
-                               "Peer median  %{customdata:,.1f}<extra></extra>")))
-            fig.add_vline(x=100, line=dict(color=T.BASELINE, width=1.5, dash="dash"),
-                          annotation_text="peer median",
-                          annotation_position="bottom right",
-                          annotation_font=dict(size=10.5, color=T.MUTED))
+                x=pvals,
+                y=labels,
+                orientation="h",
+                marker=dict(
+                    color=[
+                        T.CRITICAL if v > 130 else T.BLUE if v > 70 else T.GOOD 
+                        for v in pvals
+                    ],
+                    line=dict(color=T.SURFACE, width=1.5)
+                ),
+                text=text_labels,
+                textposition="outside",
+                cliponaxis=False,
+                customdata=list(zip(medians, raw_vals)),
+                hovertemplate=(
+                    "<b>%{y}</b><br>"
+                    "Plant Value: <b>%{customdata[1]:,.1f}</b><br>"
+                    "Peer Median: <b>%{customdata[0]:,.1f}</b><br>"
+                    "Ratio: <b>%{x:.0f}%</b> of median<extra></extra>"
+                )
+            ))
+
+            # Baseline at 100% (Peer Median)
+            fig.add_vline(
+                x=100, 
+                line=dict(color=T.BASELINE, width=1.5, dash="dash"),
+                annotation_text="Peer Median (100%)",
+                annotation_position="top right",
+                annotation_font=dict(size=10, color=T.MUTED)
+            )
+
             fig.update_layout(
-                title=f"Against {p.area_type} peers (n={len(peer)}), median = 100",
-                height=300, bargap=0.35,
-                xaxis=dict(title="% of peer median",
-                           range=[0, max(pvals) * 1.25 if pvals else 200]),
-                yaxis=dict(title=None))
+                title=dict(text=f"<b>Vs. {p.area_type} Peers</b> (n={len(peer)})", font=dict(size=14)),
+                height=320,
+                margin=dict(l=10, r=60, t=40, b=30),
+                bargap=0.3,
+                xaxis=dict(
+                    title="% of peer median",
+                    range=[0, max(max(pvals, default=100) * 1.3, 130)],
+                    showgrid=True,
+                    gridcolor="rgba(0,0,0,0.05)"
+                ),
+                yaxis=dict(autorange="reversed", title=None) # Keeps top metric at top
+            )
             chart(fig)
 
     if VIEW == "pmodel":
@@ -1063,7 +1125,10 @@ if VIEW in SEC_PLANT:
                 verdict = ("above" if gap > 0 else "below")
                 st.markdown(
                     f'<div class="caption">This plant runs <b>{abs(gap):.1f} pp '
-                    f'{verdict}</b> expectation — pattern: <b>{p.archetype}</b>.</div>',
+                    f'{verdict}</b> what its network characteristics predict — '
+                    f'{abs(float(p.unexplained_m3)):,.0f} m³ a year '
+                    f'{"unaccounted for" if gap > 0 else "better than expected"}. '
+                    f'Pattern: <b>{p.archetype}</b>.</div>',
                     unsafe_allow_html=True)
             with c8:
                 sig = pd.DataFrame({
@@ -1078,9 +1143,11 @@ if VIEW in SEC_PLANT:
                               f"{p.step_shift_pp:+.2f} pp (p={p.step_p:.3f})",
                               f"{int(p.anomaly_months)}",
                               f"{p.volatility_pp:.2f} pp"]})
-                table(sig, [(c, c, str) for c in sig.columns], height=300)
-                st.markdown('<div class="caption">Negative trend = improving; '
-                            'p above 0.05 = not distinguishable from noise.</div>',
+                st.dataframe(sig, width='stretch', hide_index=True,
+                             height=300)
+                st.markdown('<div class="caption">A negative trend means '
+                            'improving. p-values above 0.05 mean the movement is '
+                            'not distinguishable from noise.</div>',
                             unsafe_allow_html=True)
 
     if VIEW == "phist":
@@ -1117,17 +1184,87 @@ if VIEW in SEC_PLANT:
             cols = ["date", "production_m3", "billed_m3", "nrw_m3", "nrw_pct",
                     "physical_loss_m3", "commercial_loss_m3", "pipe_bursts",
                     "complaints", "pressure_bar", "rainfall_mm", "nrw_value_rm"]
-            table(hist[cols], [
-                ("date", "Month", lambda v: pd.to_datetime(v).strftime("%b %Y")),
-                ("production_m3", "Production m³", lambda v: f"{v:,.0f}"),
-                ("billed_m3", "Billed m³", lambda v: f"{v:,.0f}"),
-                ("nrw_m3", "NRW m³", lambda v: f"{v:,.0f}"),
-                ("nrw_pct", "Rate", lambda v: f"{v:.1f}%"),
-                ("physical_loss_m3", "Physical m³", lambda v: f"{v:,.0f}"),
-                ("commercial_loss_m3", "Commercial m³", lambda v: f"{v:,.0f}"),
-                ("pipe_bursts", "Bursts", lambda v: f"{int(v)}"),
-                ("complaints", "Complaints", lambda v: f"{int(v)}"),
-                ("pressure_bar", "Pressure bar", lambda v: f"{v:.2f}"),
-                ("rainfall_mm", "Rain mm", lambda v: f"{v:,.0f}"),
-                ("nrw_value_rm", "Value RM", lambda v: f"{v:,.0f}"),
-            ], height=420)
+            st.dataframe(hist[cols], width='stretch', hide_index=True,
+                         column_config={
+                             "date": st.column_config.DateColumn("Month", format="MMM YYYY"),
+                             "production_m3": st.column_config.NumberColumn("Production m³", format="%,d"),
+                             "billed_m3": st.column_config.NumberColumn("Billed m³", format="%,d"),
+                             "nrw_m3": st.column_config.NumberColumn("NRW m³", format="%,d"),
+                             "nrw_pct": st.column_config.NumberColumn("Rate", format="%.1f%%"),
+                             "physical_loss_m3": st.column_config.NumberColumn("Physical m³", format="%,d"),
+                             "commercial_loss_m3": st.column_config.NumberColumn("Commercial m³", format="%,d"),
+                             "pipe_bursts": st.column_config.NumberColumn("Bursts"),
+                             "complaints": st.column_config.NumberColumn("Complaints"),
+                             "pressure_bar": st.column_config.NumberColumn("Pressure bar", format="%.2f"),
+                             "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%,d"),
+                             "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d")})
+    if VIEW == "pcomp":
+        st.markdown("#### <b>Side-by-Side Plant Comparison</b>", unsafe_allow_html=True)
+        
+        # --- Key Metrics Comparison Table/Tiles ---
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"##### **{plant}** (Selected)")
+            st.markdown(T.tile("LIPS Score", f"{p.lips:.1f}", f"Rank {p.lips_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Water Loss Rate", f"{p.nrw_pct:.1f}%", f"Rank {p.rate_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Water Lost", f"{m3(p.nrw_m3)} m³", f"Rank {p.volume_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Burst Rate", f"{p.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
+
+        with c2:
+            st.markdown(f"##### **{p2_name}** (Comparison)")
+            st.markdown(T.tile("LIPS Score", f"{p2.lips:.1f}", f"Rank {p2.lips_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Water Loss Rate", f"{p2.nrw_pct:.1f}%", f"Rank {p2.rate_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Water Lost", f"{m3(p2.nrw_m3)} m³", f"Rank {p2.volume_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile("Burst Rate", f"{p2.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
+
+        st.markdown("")
+        st.markdown("")
+        st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
+
+        # --- Comparative Charts ---
+        st.markdown("#### <b>Comparative Charts</b>", unsafe_allow_html=True)
+        chart_col1, chart_col2 = st.columns(2)
+
+        # Chart 1: Historical NRW Rate Comparison
+        with chart_col1:
+            fig_rate = go.Figure()
+            fig_rate.add_trace(go.Scatter(
+                x=hist.date, y=hist.nrw_pct, mode="lines+markers", name=plant,
+                line=dict(color=T.BLUE, width=2)
+            ))
+            fig_rate.add_trace(go.Scatter(
+                x=hist2.date, y=hist2.nrw_pct, mode="lines+markers", name=p2_name,
+                line=dict(color=T.ORANGE, width=2)
+            ))
+            fig_rate.update_layout(
+                title="Loss Rate Trend Comparison (%)",
+                height=350,
+                xaxis=dict(title=None),
+                yaxis=dict(title="NRW Rate (%)", ticksuffix="%"),
+                legend=dict(orientation="h", y=1.1)
+            )
+            chart(fig_rate)
+
+        # Chart 2: Physical vs Commercial Loss Volume Comparison
+        with chart_col2:
+            fig_vol = go.Figure()
+            fig_vol.add_trace(go.Bar(
+                x=["Physical Loss", "Commercial Loss"],
+                y=[p.physical_loss_m3, p.commercial_loss_m3],
+                name=plant,
+                marker=dict(color=T.BLUE)
+            ))
+            fig_vol.add_trace(go.Bar(
+                x=["Physical Loss", "Commercial Loss"],
+                y=[p2.physical_loss_m3, p2.commercial_loss_m3],
+                name=p2_name,
+                marker=dict(color=T.ORANGE)
+            ))
+            fig_vol.update_layout(
+                title="Loss Breakdown Comparison (m³)",
+                height=350,
+                barmode="group",
+                yaxis=dict(title="Volume (m³)"),
+                legend=dict(orientation="h", y=1.1)
+            )
+            chart(fig_vol)
