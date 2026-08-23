@@ -393,13 +393,12 @@ tot_phys = sel.physical_loss_m3.sum()
 sys_pct = tot_nrw / tot_prod * 100
 n_plants = len(sel)
 
-HIGH_RISK_FRAC = 0.75  # top 20% of plants by LIPS score counts as "high risk"
+HIGH_RISK_THRESHOLD = 75  # plants with LIPS score above this count as "high risk"
 
 prev = yearly[(yearly.year == year - 1) & yearly.plant.isin(sel.plant)]
 prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) else np.nan
 
-thresh_cur = sel.lips.quantile(1 - HIGH_RISK_FRAC) if n_plants else np.nan
-high_risk = int((sel.lips >= thresh_cur).sum()) if n_plants else 0
+high_risk = int((sel.lips > HIGH_RISK_THRESHOLD).sum()) if n_plants else 0
 
 lips_q1 = sel.lips.quantile(0.25) if n_plants else 0.0
 lips_q3 = sel.lips.quantile(0.75) if n_plants else 0.0
@@ -419,7 +418,7 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("High risk plants", f"{high_risk}", f" 75 by LIPS · of {n_plants} plants"),
+    ("High risk plants", f"{high_risk}", f"LIPS > {HIGH_RISK_THRESHOLD} · of {n_plants} plants"),
     ("LIPS interquartile range", f"{lips_iqr:.1f}", f"Q1 {lips_q1:.1f} – Q3 {lips_q3:.1f}"),
 ]
 _cells = "".join(
