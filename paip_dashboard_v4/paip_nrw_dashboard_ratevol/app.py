@@ -650,11 +650,8 @@ if VIEW in SEC_PRIORITY:
     if VIEW == "rank":
         st.markdown("### Leakage Intervention Priority Score (4-Factor LIPS)")
         st.markdown(T.callout(
-            "LIPS prioritizes intervention by combining four operational indicators into a balanced 0–100 score:<br>"
-            "• <b>Loss Density (40%)</b>: Concentration of NRW volume per kilometer of pipe.<br>"
-            "• <b>Burst Rate (25%)</b>: Bursts per 100 km (proxy for pipe structural failure).<br>"
-            "• <b>Plant Age (20%)</b>: Deterioration and asset condition risk.<br>"
-            "• <b>Account Density (15%)</b>: Customer connections per km (commercial/metering exposure)."
+            "LIPS blends loss density, burst rate, plant age, and account "
+            "density into one 0–100 priority score."
         ), unsafe_allow_html=True)
 
         c1, c2 = st.columns([1, 1])
@@ -773,13 +770,10 @@ if VIEW in SEC_LOSS:
         ratio = w_vol / w_rate if w_rate else np.nan
 
         st.markdown(T.callout(
-            f"Ranking the same {n_plants} plants by loss <b>rate</b> and by loss "
-            f"<b>volume</b> produces a rank correlation of <b>ρ = {rho:.2f}</b> "
-            f"(Kendall τ = {tau:.2f}). The two top-{n_top} queues share "
-            f"<b>{overlap} plant{'s' if overlap != 1 else ''}</b>. The volume queue "
-            f"covers <b>{m3(w_vol)} m³</b> of losses against <b>{m3(w_rate)} m³</b> "
-            f"for the rate queue — <b>{ratio:.1f}× more water</b> for the same ten "
-            f"crew deployments.",
+            f"Rate and volume rankings often disagree — the top-{n_top} queues "
+            f"share only <b>{overlap} plant{'s' if overlap != 1 else ''}</b>, and "
+            f"the volume queue covers <b>{ratio:.1f}× more water</b> for the same "
+            f"crew effort.",
             "crit" if overlap <= 2 else "warn"), unsafe_allow_html=True)
 
         c1, c2 = st.columns([1.25, 1])
@@ -875,12 +869,8 @@ if VIEW in SEC_LOSS:
     if VIEW == "comp":
         st.markdown("### Physical leakage versus commercial loss")
         st.markdown(T.callout(
-            "Physical (real) losses are water escaping the network — pipe repair "
-            "and pressure management recover them. Commercial (apparent) losses are "
-            "water delivered but not billed — meter under-registration, "
-            "unauthorised connections, billing lag — and they need metering and "
-            "enforcement instead. The two demand entirely different interventions, "
-            "so the split determines <i>which</i> crew to send, not just where."),
+            "Physical losses need pipe repair; commercial losses need metering "
+            "and billing fixes — the split decides which crew to send."),
             unsafe_allow_html=True)
 
         c1, c2 = st.columns([1.3, 1])
@@ -966,14 +956,7 @@ if VIEW in SEC_PLANT:
                     f'<b>Burst risk for {burst_metrics["horizon"]}: '
                     f'<span style="color:{_col}">{_icon} {_b.risk_pct:.0f}% · '
                     f'{_band}</span></b> — ranked {int(_b.risk_rank)} of '
-                    f'{len(burst_pred)} plants. '
-                    f'{"Above" if _b.will_flag else "Below"} the dispatch threshold '
-                    f'of {burst_metrics["operating_threshold"]*100:.0f}%. '
-                    f'This plant recorded {int(_b.pipe_bursts)} burst(s) in the '
-                    f'latest month and averaged {_b.bursts_roll3:.1f} over the last '
-                    f'three. The band is stated in words as well as colour, and the '
-                    f'probability is calibrated — 80% here means it happened about '
-                    f'80% of the time in testing.</div>',
+                    f'{len(burst_pred)} plants, {int(_b.pipe_bursts)} burst(s) last month.</div>',
                     unsafe_allow_html=True)
 
         st.markdown("")
@@ -1067,10 +1050,7 @@ if VIEW in SEC_PLANT:
                 verdict = ("above" if gap > 0 else "below")
                 st.markdown(
                     f'<div class="caption">This plant runs <b>{abs(gap):.1f} pp '
-                    f'{verdict}</b> what its network characteristics predict — '
-                    f'{abs(float(p.unexplained_m3)):,.0f} m³ a year '
-                    f'{"unaccounted for" if gap > 0 else "better than expected"}. '
-                    f'Pattern: <b>{p.archetype}</b>.</div>',
+                    f'{verdict}</b> expectation — pattern: <b>{p.archetype}</b>.</div>',
                     unsafe_allow_html=True)
             with c8:
                 sig = pd.DataFrame({
@@ -1086,9 +1066,8 @@ if VIEW in SEC_PLANT:
                               f"{int(p.anomaly_months)}",
                               f"{p.volatility_pp:.2f} pp"]})
                 table(sig, [(c, c, str) for c in sig.columns], height=300)
-                st.markdown('<div class="caption">A negative trend means '
-                            'improving. p-values above 0.05 mean the movement is '
-                            'not distinguishable from noise.</div>',
+                st.markdown('<div class="caption">Negative trend = improving; '
+                            'p above 0.05 = not distinguishable from noise.</div>',
                             unsafe_allow_html=True)
 
     if VIEW == "phist":
