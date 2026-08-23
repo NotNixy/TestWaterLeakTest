@@ -118,6 +118,30 @@ def load_coverage():
     return None
 
 
+@st.cache_data
+def load_lips_schedule(yr: int):
+    """Load an official pre-computed LIPS schedule for a given year, if one
+    exists on disk (e.g. lips_schedule_2025.csv). Falls back to None so the
+    caller can recompute with score_lips() instead."""
+    p = DATA / f"lips_schedule_{int(yr)}.csv"
+    if p.exists():
+        return pd.read_csv(p)
+    return None
+
+
+def lips_for_year(yr: int, plants, weights_tuple):
+    """Return a plant-level dataframe with a `lips` column for the given
+    year — using the official schedule file when available (exact match to
+    the published ranking), or recomputing from the yearly table otherwise."""
+    sched = load_lips_schedule(yr)
+    if sched is not None:
+        out = sched[sched.plant.isin(plants)].copy()
+        if len(out):
+            return out
+    df = yearly[(yearly.year == yr) & yearly.plant.isin(plants)]
+    return score_lips(df, weights_tuple) if len(df) else df
+
+
 monthly, yearly, crosswalk, quality, missing = load()
 ml_plant, ml_monthly, ml_metrics = load_ml()
 HAS_ML = ml_plant is not None
@@ -402,8 +426,8 @@ thresh_cur = sel.lips.quantile(1 - HIGH_RISK_FRAC) if n_plants else np.nan
 high_risk = int((sel.lips >= thresh_cur).sum()) if n_plants else 0
 avg_lips = sel.lips.mean() if n_plants else 0.0
 
-prev_scored = score_lips(prev, tuple(sorted(lips_weights.items()))) if len(prev) else prev
-if len(prev):
+prev_scored = lips_for_year(year - 1, sel.plant, tuple(sorted(lips_weights.items())))
+if len(prev_scored):
     thresh_prev = prev_scored.lips.quantile(1 - HIGH_RISK_FRAC)
     prev_high_risk = int((prev_scored.lips >= thresh_prev).sum())
     prev_avg_lips = prev_scored.lips.mean()
