@@ -262,8 +262,6 @@ with top_col2:
                 '<div class="sb-sub" style="font-size: 0.9rem;">Non-Revenue Water intervention targeting</div>',
                 unsafe_allow_html=True)
 
-st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
-
 
 # ==========================================================================
 # Sidebar (Filters & Nav)
@@ -315,8 +313,6 @@ with st.sidebar:
         st.markdown('<div class="pop-h">Tick to narrow. Nothing ticked means '
                     'everything.</div>', unsafe_allow_html=True)
 
-        filters = st.radio("Filter by:", ["Plant name", "Districts"], horizontal=True, key="filter")
-
         def _clear():
             for pre, opts in (("f_p_", _p_all), ("f_d_", _d_all)):
                 for o in opts:
@@ -324,14 +320,8 @@ with st.sidebar:
 
         st.button("Clear all", key="f_clear", type="tertiary", on_click=_clear)
 
-        if filters == "Plant name":
-            target = [("Plant Name", "f_p_", _p_all, 4)]
-        elif filters == "Districts":
-            target = [("District", "f_d_", _d_all, 4)]
-        else:
-            target = []
-
-        for _title, _pre, _opts, _cols in target:
+        for _title, _pre, _opts, _cols in (("Plant Name", "f_p_", _p_all, 4),
+                                           ("District", "f_d_", _d_all, 4)):
             st.markdown(f'<div class="pop-s">{_title}</div>',
                         unsafe_allow_html=True)
             _cc = st.columns(_cols)
@@ -427,6 +417,7 @@ _cells = "".join(
     f'<div class="kpi-v">{v}</div><div class="kpi-s">{s_}</div></div>'
     for l, v, s_ in _kpis)
 st.markdown(f'<div class="kpistrip">{_cells}</div>', unsafe_allow_html=True)
+st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
 
 VIEW = st.session_state.view
 
@@ -537,7 +528,7 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%")
             chart(mini(f, h=142, legend=True))
             st.markdown(
-                '<div class="ov-line">Compares loss rate vs volume loss.</div>',
+                '<div class="ov-line">Compares small % losses vs big volume losses.</div>',
                 unsafe_allow_html=True)
 
     # Row 2: Graphs 3 & 4
