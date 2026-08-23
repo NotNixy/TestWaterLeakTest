@@ -398,12 +398,33 @@ prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) els
 
 high_risk = int((sel.lips >= 66).sum())
 avg_lips = sel.lips.mean() if n_plants else 0.0
+
+prev_scored = score_lips(prev, tuple(sorted(lips_weights.items()))) if len(prev) else prev
+prev_high_risk = int((prev_scored.lips >= 66).sum()) if len(prev) else np.nan
+prev_avg_lips = prev_scored.lips.mean() if len(prev) else np.nan
+
 delta = ""
 if not np.isnan(prev_pct):
     _d = sys_pct - prev_pct
     _cls = "kpi-good" if _d < 0 else "kpi-bad"
     delta = (f'<span class="{_cls}">{"↓" if _d < 0 else "↑"} '
              f'{abs(_d):.2f} pp</span> vs {year-1}')
+
+high_risk_delta = ""
+if not np.isnan(prev_high_risk):
+    _dh = high_risk - prev_high_risk
+    _cls = "kpi-good" if _dh < 0 else ("kpi-bad" if _dh > 0 else "")
+    _arrow = "↓" if _dh < 0 else ("↑" if _dh > 0 else "→")
+    high_risk_delta = (f'<span class="{_cls}">{_arrow} '
+                       f'{abs(_dh)}</span> vs {year-1}')
+
+avg_lips_delta = ""
+if not np.isnan(prev_avg_lips):
+    _dl = avg_lips - prev_avg_lips
+    _cls = "kpi-good" if _dl < 0 else ("kpi-bad" if _dl > 0 else "")
+    _arrow = "↓" if _dl < 0 else ("↑" if _dl > 0 else "→")
+    avg_lips_delta = (f'<span class="{_cls}">{_arrow} '
+                      f'{abs(_dl):.1f}</span> vs {year-1}')
 
 _top10_share = (sel.nsmallest(min(10, n_plants), "lips_rank").nrw_m3.sum()
                 / tot_nrw * 100) if tot_nrw else 0.0
@@ -412,8 +433,8 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("High risk plants", f"{high_risk}", f"LIPS ≥ 66 · of {n_plants} plants"),
-    ("Average LIPS score", f"{avg_lips:.1f}", "system-wide, 0–100 scale"),
+    ("High risk plants", f"{high_risk}", high_risk_delta or f"LIPS ≥ 66 · of {n_plants} plants"),
+    ("Average LIPS score", f"{avg_lips:.1f}", avg_lips_delta or "system-wide, 0–100 scale"),
 ]
 _cells = "".join(
     f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>{l}</div>'
