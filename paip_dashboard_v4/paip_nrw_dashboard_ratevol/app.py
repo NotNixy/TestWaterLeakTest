@@ -411,7 +411,7 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("High risk plants", f"{high_risk}", f"LIPS ≥ 66 · of {n_plants} plants"),
+    ("High risk plants", f"{high_risk}", f"LIPS ≥ 70 · of {n_plants} plants"),
 ]
 _cells = "".join(
     f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>{l}</div>'
