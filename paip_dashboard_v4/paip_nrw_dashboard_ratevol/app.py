@@ -529,7 +529,7 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%")
             chart(mini(f, h=142, legend=True))
             st.markdown(
-                '<div class="ov-line">Compares small % losses vs big volume losses.</div>',
+                '<div class="ov-line">Compares loss rate vs volume loss.</div>',
                 unsafe_allow_html=True)
 
     # Row 2: Graphs 3 & 4
