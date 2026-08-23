@@ -393,15 +393,23 @@ tot_phys = sel.physical_loss_m3.sum()
 sys_pct = tot_nrw / tot_prod * 100
 n_plants = len(sel)
 
+HIGH_RISK_FRAC = 0.20  # top 20% of plants by LIPS score counts as "high risk"
+
 prev = yearly[(yearly.year == year - 1) & yearly.plant.isin(sel.plant)]
 prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) else np.nan
 
-high_risk = int((sel.lips >= 66).sum())
+thresh_cur = sel.lips.quantile(1 - HIGH_RISK_FRAC) if n_plants else np.nan
+high_risk = int((sel.lips >= thresh_cur).sum()) if n_plants else 0
 avg_lips = sel.lips.mean() if n_plants else 0.0
 
 prev_scored = score_lips(prev, tuple(sorted(lips_weights.items()))) if len(prev) else prev
-prev_high_risk = int((prev_scored.lips >= 66).sum()) if len(prev) else np.nan
-prev_avg_lips = prev_scored.lips.mean() if len(prev) else np.nan
+if len(prev):
+    thresh_prev = prev_scored.lips.quantile(1 - HIGH_RISK_FRAC)
+    prev_high_risk = int((prev_scored.lips >= thresh_prev).sum())
+    prev_avg_lips = prev_scored.lips.mean()
+else:
+    prev_high_risk = np.nan
+    prev_avg_lips = np.nan
 
 delta = ""
 if not np.isnan(prev_pct):
@@ -433,7 +441,7 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("High risk plants", f"{high_risk}", high_risk_delta or f"LIPS ≥ 66 · of {n_plants} plants"),
+    ("High risk plants", f"{high_risk}", high_risk_delta or f"Top 20% by LIPS · of {n_plants} plants"),
     ("Average LIPS score", f"{avg_lips:.1f}", avg_lips_delta or "system-wide, 0–100 scale"),
 ]
 _cells = "".join(
