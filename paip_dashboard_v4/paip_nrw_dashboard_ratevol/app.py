@@ -277,11 +277,12 @@ NAV = [
                       ("Loss composition", "comp")]),
     ("PLANT PROFILE", [("Summary", "psum"),
                        ("What the model sees", "pmodel"),
-                       ("History", "phist")]),
+                       ("History", "phist"),
+                      ("Comparison", "pcomp")]),
 ]
 SEC_PRIORITY = {"rank", "sched", "curve"}
 SEC_LOSS = {"ratevol", "comp"}
-SEC_PLANT = {"psum", "pmodel", "phist"}
+SEC_PLANT = {"psum", "pmodel", "phist", "pcomp"}
 
 if "view" not in st.session_state:
     st.session_state.view = "cmd"
