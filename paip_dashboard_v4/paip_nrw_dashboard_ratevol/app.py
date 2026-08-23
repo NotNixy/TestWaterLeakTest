@@ -703,7 +703,7 @@ if VIEW in SEC_PRIORITY:
 
     if VIEW == "curve":
         st.markdown("### Recovery curve — how far a crew programme gets")
-        st.markdown('<div class="caption">📊 Shows how fast the queue order '
+        st.markdown('<div class="caption"> Shows how fast the queue order '
                     'recovers total water loss as more plants are visited.</div>',
                     unsafe_allow_html=True)
 
@@ -789,6 +789,10 @@ if VIEW in SEC_LOSS:
                 cond, [f"Both queues", f"Top {n_top} by volume", f"Top {n_top} by rate"],
                 default="Neither")
 
+            st.markdown('<div class="caption"> Shows where a plant\'s loss rate '
+                        'and total loss volume disagree, sized by water lost.</div>',
+                        unsafe_allow_html=True)
+
             order = [f"Top {n_top} by volume", f"Top {n_top} by rate", "Both queues", "Neither"]
             colors = {f"Top {n_top} by volume": T.BLUE, f"Top {n_top} by rate": T.ORANGE,
                     "Both queues": T.AQUA, "Neither": T.NEUTRAL}
@@ -831,12 +835,12 @@ if VIEW in SEC_LOSS:
                            dtick=1, minor=dict(showgrid=False)),
                 yaxis=dict(title="Loss rate (% of production)", ticksuffix="%"))
             chart(fig)
-            st.markdown('<div class="caption">📊 Shows where a plant\'s loss rate '
-                        'and total loss volume disagree, sized by water lost.</div>',
-                        unsafe_allow_html=True)
 
         with c2:
             st.markdown("###### How far plants move between the two rankings")
+            st.markdown('<div class="caption"> Shows how much each plant\'s '
+                        'rank shifts between the rate ranking and the volume ranking.</div>',
+                        unsafe_allow_html=True)
             n_dumb = min(12, n_plants)
             mv = sel.nsmallest(n_dumb, "volume_rank")[
                 ["plant", "rate_rank", "volume_rank", "nrw_m3", "nrw_pct"]].copy()
@@ -871,9 +875,6 @@ if VIEW in SEC_LOSS:
                            range=[0, n_plants + 5]),
                 yaxis=dict(title=None, tickfont=dict(size=11)))
             chart(fig)
-            st.markdown('<div class="caption">📊 Shows how much each plant\'s '
-                        'rank shifts between the rate ranking and the volume ranking.</div>',
-                        unsafe_allow_html=True)
 
     if VIEW == "comp":
         st.markdown("### Physical leakage versus commercial loss")
@@ -881,35 +882,33 @@ if VIEW in SEC_LOSS:
             "Physical losses need pipe repair; commercial losses need metering "
             "and billing fixes — the split decides which crew to send."),
             unsafe_allow_html=True)
+        st.markdown('<div class="caption"> Splits each plant\'s water loss '
+                    'into physical leaks and commercial (billing) losses.</div>',
+                    unsafe_allow_html=True)
 
-        c1, c2 = st.columns([1.3, 1])
-        with c1:
-            n_show = min(16, n_plants)
-            comp = sel.nlargest(n_show, "nrw_m3").sort_values("nrw_m3")
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=comp.physical_loss_m3, y=comp.plant, orientation="h",
-                name="Physical leakage", marker=dict(color=T.BLUE,
-                                                     line=dict(color=T.SURFACE, width=2)),
-                customdata=comp.physical_share_pct,
-                hovertemplate=("<b>%{y}</b><br>Physical  %{x:,.0f} m³ "
-                               "(%{customdata:.0f}% of loss)<extra></extra>")))
-            fig.add_trace(go.Bar(
-                x=comp.commercial_loss_m3, y=comp.plant, orientation="h",
-                name="Commercial loss", marker=dict(color=T.ORANGE,
-                                                    line=dict(color=T.SURFACE, width=2)),
-                customdata=100 - comp.physical_share_pct,
-                hovertemplate=("<b>%{y}</b><br>Commercial  %{x:,.0f} m³ "
-                               "(%{customdata:.0f}% of loss)<extra></extra>")))
-            fig.update_layout(
-                title=f"Loss composition, {n_show} largest-loss plants", height=600,
-                barmode="stack", bargap=0.3,
-                xaxis=dict(title="Volume lost (m³)"),
-                yaxis=dict(title=None, tickfont=dict(size=11)))
-            chart(fig)
-            st.markdown('<div class="caption">📊 Splits each plant\'s water loss '
-                        'into physical leaks and commercial (billing) losses.</div>',
-                        unsafe_allow_html=True)
+        n_show = min(16, n_plants)
+        comp = sel.nlargest(n_show, "nrw_m3").sort_values("nrw_m3")
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=comp.physical_loss_m3, y=comp.plant, orientation="h",
+            name="Physical leakage", marker=dict(color=T.BLUE,
+                                                 line=dict(color=T.SURFACE, width=2)),
+            customdata=comp.physical_share_pct,
+            hovertemplate=("<b>%{y}</b><br>Physical  %{x:,.0f} m³ "
+                           "(%{customdata:.0f}% of loss)<extra></extra>")))
+        fig.add_trace(go.Bar(
+            x=comp.commercial_loss_m3, y=comp.plant, orientation="h",
+            name="Commercial loss", marker=dict(color=T.ORANGE,
+                                                line=dict(color=T.SURFACE, width=2)),
+            customdata=100 - comp.physical_share_pct,
+            hovertemplate=("<b>%{y}</b><br>Commercial  %{x:,.0f} m³ "
+                           "(%{customdata:.0f}% of loss)<extra></extra>")))
+        fig.update_layout(
+            title=f"Loss composition, {n_show} largest-loss plants", height=600,
+            barmode="stack", bargap=0.3,
+            xaxis=dict(title="Volume lost (m³)"),
+            yaxis=dict(title=None, tickfont=dict(size=11)))
+        chart(fig)
 
 
 # ==========================================================================
