@@ -706,10 +706,9 @@ if VIEW in SEC_PRIORITY:
 
     if VIEW == "curve":
         st.markdown("### Recovery curve — how far a crew programme gets")
-        st.markdown(T.callout(
-            "Shows how fast the queue order recovers total water loss as "
-            "more plants are visited."
-        ), unsafe_allow_html=True)
+        st.markdown('<div class="caption">📊 Shows how fast the queue order '
+                    'recovers total water loss as more plants are visited.</div>',
+                    unsafe_allow_html=True)
 
         order_lips = sel.sort_values("lips_rank")
         order_rate = sel.sort_values("rate_rank")
