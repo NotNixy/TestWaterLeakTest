@@ -1053,7 +1053,7 @@ if VIEW in SEC_PLANT:
                     line=dict(color=T.SURFACE, width=1.5)
                 ),
                 text=text_labels,
-                textposition="outside",
+                textposition="inside",
                 cliponaxis=False,
                 customdata=list(zip(medians, raw_vals)),
                 hovertemplate=(
