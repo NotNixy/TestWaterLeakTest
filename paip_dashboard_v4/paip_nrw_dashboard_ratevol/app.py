@@ -258,7 +258,7 @@ top_col1, top_col2 = st.columns([0.08, 0.92])
 with top_col1:
     st.image(ASSETS / "logo.png", width=54)
 with top_col2:
-    st.markdown('<div class="sb-brand" style="font-size: 1.5rem; font-weight: bold;">PENGURUSAN AIR PAHANG BERHAD</div>'
+    st.markdown('<div class="sb-brand" style="font-size: 1.5rem; font-weight: 700 !important;">PENGURUSAN AIR PAHANG BERHAD</div>'
                 '<div class="sb-sub" style="font-size: 0.9rem;">Non-Revenue Water intervention targeting</div>',
                 unsafe_allow_html=True)
 
@@ -422,7 +422,7 @@ _kpis = [
     ("LIPS interquartile range", f"{lips_iqr:.1f}", f"Q1 {lips_q1:.1f} – Q3 {lips_q3:.1f}"),
 ]
 _cells = "".join(
-    f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>{l}</div>'
+    f'<div class="kpi"><div class="kpi-l"><span class="drop"></span><b>{l}</b></div>'
     f'<div class="kpi-v">{v}</div><div class="kpi-s">{s_}</div></div>'
     for l, v, s_ in _kpis)
 st.markdown(f'<div class="kpistrip">{_cells}</div>', unsafe_allow_html=True)
@@ -703,7 +703,7 @@ if VIEW in SEC_PRIORITY:
 
     if VIEW == "curve":
         st.markdown("### Recovery curve — how far a crew programme gets")
-        st.markdown('<div class="caption"> Shows how fast the queue order '
+        st.markdown('<div class="caption">📊 Shows how fast the queue order '
                     'recovers total water loss as more plants are visited.</div>',
                     unsafe_allow_html=True)
 
@@ -789,7 +789,7 @@ if VIEW in SEC_LOSS:
                 cond, [f"Both queues", f"Top {n_top} by volume", f"Top {n_top} by rate"],
                 default="Neither")
 
-            st.markdown('<div class="caption"> Shows where a plant\'s loss rate '
+            st.markdown('<div class="caption">📊 Shows where a plant\'s loss rate '
                         'and total loss volume disagree, sized by water lost.</div>',
                         unsafe_allow_html=True)
 
@@ -838,7 +838,7 @@ if VIEW in SEC_LOSS:
 
         with c2:
             st.markdown("###### How far plants move between the two rankings")
-            st.markdown('<div class="caption"> Shows how much each plant\'s '
+            st.markdown('<div class="caption">📊 Shows how much each plant\'s '
                         'rank shifts between the rate ranking and the volume ranking.</div>',
                         unsafe_allow_html=True)
             n_dumb = min(12, n_plants)
@@ -882,7 +882,7 @@ if VIEW in SEC_LOSS:
             "Physical losses need pipe repair; commercial losses need metering "
             "and billing fixes — the split decides which crew to send."),
             unsafe_allow_html=True)
-        st.markdown('<div class="caption"> Splits each plant\'s water loss '
+        st.markdown('<div class="caption">📊 Splits each plant\'s water loss '
                     'into physical leaks and commercial (billing) losses.</div>',
                     unsafe_allow_html=True)
 
