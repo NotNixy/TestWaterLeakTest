@@ -706,9 +706,10 @@ if VIEW in SEC_PRIORITY:
 
     if VIEW == "curve":
         st.markdown("### Recovery curve — how far a crew programme gets")
-        st.markdown('<div class="caption">📊 Shows how fast the queue order '
-                    'recovers total water loss as more plants are visited.</div>',
-                    unsafe_allow_html=True)
+        st.markdown(T.callout(
+            "Shows how fast the queue order recovers total water loss as "
+            "more plants are visited."
+        ), unsafe_allow_html=True)
 
         order_lips = sel.sort_values("lips_rank")
         order_rate = sel.sort_values("rate_rank")
@@ -718,11 +719,32 @@ if VIEW in SEC_PRIORITY:
             return df.nrw_m3.cumsum() / total_nrw * 100
 
         x = np.arange(1, n_plants + 1)
+        curve_lips = curve(order_lips)
+        curve_rate = curve(order_rate)
+
+        # Plants needed to recover half the total NRW under each ordering,
+        # used to summarise which queue gets there faster.
+        n_lips_50 = int(np.searchsorted(curve_lips.values, 50) + 1)
+        n_rate_50 = int(np.searchsorted(curve_rate.values, 50) + 1)
+        if n_lips_50 < n_rate_50:
+            summary = (f"The LIPS/volume order reaches 50% of total water loss "
+                       f"recovered after just {n_lips_50} plants, versus "
+                       f"{n_rate_50} for the rate order.")
+        elif n_rate_50 < n_lips_50:
+            summary = (f"The rate order reaches 50% of total water loss "
+                       f"recovered after just {n_rate_50} plants, versus "
+                       f"{n_lips_50} for the LIPS/volume order.")
+        else:
+            summary = (f"Both orderings need {n_lips_50} plants to recover "
+                       f"50% of total water loss.")
+        st.markdown(f'<div class="caption">📊 {summary}</div>',
+                    unsafe_allow_html=True)
+
         fig = go.Figure()
-        for name, df_, col in [("LIPS / volume order", order_lips, T.BLUE),
-                               ("Rate order", order_rate, T.ORANGE)]:
+        for name, y, col in [("LIPS / volume order", curve_lips, T.BLUE),
+                             ("Rate order", curve_rate, T.ORANGE)]:
             fig.add_trace(go.Scatter(
-                x=x, y=curve(df_), mode="lines", name=name,
+                x=x, y=y, mode="lines", name=name,
                 line=dict(color=col, width=2.5),
                 hovertemplate=(f"<b>{name}</b><br>First %{{x}} plants<br>"
                                 "cover %{y:.1f}% of NRW<extra></extra>")))
