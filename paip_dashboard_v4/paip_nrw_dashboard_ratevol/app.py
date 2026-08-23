@@ -118,30 +118,6 @@ def load_coverage():
     return None
 
 
-@st.cache_data
-def load_lips_schedule(yr: int):
-    """Load an official pre-computed LIPS schedule for a given year, if one
-    exists on disk (e.g. lips_schedule_2025.csv). Falls back to None so the
-    caller can recompute with score_lips() instead."""
-    p = DATA / f"lips_schedule_{int(yr)}.csv"
-    if p.exists():
-        return pd.read_csv(p)
-    return None
-
-
-def lips_for_year(yr: int, plants, weights_tuple):
-    """Return a plant-level dataframe with a `lips` column for the given
-    year — using the official schedule file when available (exact match to
-    the published ranking), or recomputing from the yearly table otherwise."""
-    sched = load_lips_schedule(yr)
-    if sched is not None:
-        out = sched[sched.plant.isin(plants)].copy()
-        if len(out):
-            return out
-    df = yearly[(yearly.year == yr) & yearly.plant.isin(plants)]
-    return score_lips(df, weights_tuple) if len(df) else df
-
-
 monthly, yearly, crosswalk, quality, missing = load()
 ml_plant, ml_monthly, ml_metrics = load_ml()
 HAS_ML = ml_plant is not None
@@ -424,16 +400,10 @@ prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) els
 
 thresh_cur = sel.lips.quantile(1 - HIGH_RISK_FRAC) if n_plants else np.nan
 high_risk = int((sel.lips >= thresh_cur).sum()) if n_plants else 0
-avg_lips = sel.lips.mean() if n_plants else 0.0
 
-prev_scored = lips_for_year(year - 1, sel.plant, tuple(sorted(lips_weights.items())))
-if len(prev_scored):
-    thresh_prev = prev_scored.lips.quantile(1 - HIGH_RISK_FRAC)
-    prev_high_risk = int((prev_scored.lips >= thresh_prev).sum())
-    prev_avg_lips = prev_scored.lips.mean()
-else:
-    prev_high_risk = np.nan
-    prev_avg_lips = np.nan
+lips_q1 = sel.lips.quantile(0.25) if n_plants else 0.0
+lips_q3 = sel.lips.quantile(0.75) if n_plants else 0.0
+lips_iqr = lips_q3 - lips_q1
 
 delta = ""
 if not np.isnan(prev_pct):
@@ -442,22 +412,6 @@ if not np.isnan(prev_pct):
     delta = (f'<span class="{_cls}">{"↓" if _d < 0 else "↑"} '
              f'{abs(_d):.2f} pp</span> vs {year-1}')
 
-high_risk_delta = ""
-if not np.isnan(prev_high_risk):
-    _dh = high_risk - prev_high_risk
-    _cls = "kpi-good" if _dh < 0 else ("kpi-bad" if _dh > 0 else "")
-    _arrow = "↓" if _dh < 0 else ("↑" if _dh > 0 else "→")
-    high_risk_delta = (f'<span class="{_cls}">{_arrow} '
-                       f'{abs(_dh)}</span> vs {year-1}')
-
-avg_lips_delta = ""
-if not np.isnan(prev_avg_lips):
-    _dl = avg_lips - prev_avg_lips
-    _cls = "kpi-good" if _dl < 0 else ("kpi-bad" if _dl > 0 else "")
-    _arrow = "↓" if _dl < 0 else ("↑" if _dl > 0 else "→")
-    avg_lips_delta = (f'<span class="{_cls}">{_arrow} '
-                      f'{abs(_dl):.1f}</span> vs {year-1}')
-
 _top10_share = (sel.nsmallest(min(10, n_plants), "lips_rank").nrw_m3.sum()
                 / tot_nrw * 100) if tot_nrw else 0.0
 _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else 0
@@ -465,8 +419,8 @@ _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else
 _kpis = [
     ("System loss rate", f"{sys_pct:.1f}%", delta or f"{n_plants} plants"),
     ("Water lost", f"{m3(tot_nrw)} m³", f"{m3(tot_nrw/365)} m³ per day"),
-    ("High risk plants", f"{high_risk}", high_risk_delta or f"Top 20% by LIPS · of {n_plants} plants"),
-    ("Average LIPS score", f"{avg_lips:.1f}", avg_lips_delta or "system-wide, 0–100 scale"),
+    ("High risk plants", f"{high_risk}", f"Top 20% by LIPS · of {n_plants} plants"),
+    ("LIPS interquartile range", f"{lips_iqr:.1f}", f"Q1 {lips_q1:.1f} – Q3 {lips_q3:.1f}"),
 ]
 _cells = "".join(
     f'<div class="kpi"><div class="kpi-l"><span class="drop"></span>{l}</div>'
