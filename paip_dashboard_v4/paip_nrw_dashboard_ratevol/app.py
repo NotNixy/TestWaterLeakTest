@@ -393,7 +393,7 @@ tot_phys = sel.physical_loss_m3.sum()
 sys_pct = tot_nrw / tot_prod * 100
 n_plants = len(sel)
 
-HIGH_RISK_FRAC = 0.20  # top 20% of plants by LIPS score counts as "high risk"
+HIGH_RISK_FRAC = 0.75  # top 20% of plants by LIPS score counts as "high risk"
 
 prev = yearly[(yearly.year == year - 1) & yearly.plant.isin(sel.plant)]
 prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) else np.nan
