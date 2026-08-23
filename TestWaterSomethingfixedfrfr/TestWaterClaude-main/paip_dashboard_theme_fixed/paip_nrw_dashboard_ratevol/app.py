@@ -192,6 +192,42 @@ def card(title, sub_=None):
     return c
 
 
+def table(df, cols, height=520, bar=None, bar_max=100.0):
+    """A palette-styled HTML table.
+
+    `cols` is a list of (column, header, formatter). `bar` names one column to
+    draw as a progress bar rather than a number — the equivalent of
+    st.column_config.ProgressColumn, but in colours we control.
+    """
+    head = "".join(f"<th>{h}</th>" for _c, h, _f in cols)
+    rows = []
+    for _, r in df.iterrows():
+        cells = []
+        for c, _h, f in cols:
+            v = r[c]
+            if c == bar:
+                pct = max(0.0, min(100.0, float(v) / bar_max * 100.0))
+                cells.append(
+                    f'<td class="num"><span class="tbar">'
+                    f'<span class="tbar-f" style="width:{pct:.1f}%"></span>'
+                    f'</span><span class="tbar-v">{f(v)}</span></td>')
+            else:
+                txt = f(v)
+                cls = "num" if isinstance(v, (int, float)) else ""
+                cells.append(f'<td class="{cls}">{txt}</td>')
+        rows.append("<tr>" + "".join(cells) + "</tr>")
+    # A size class, not just an inline height: Streamlit measures a markdown
+    # container before layout and collapses it, so whatever follows the table
+    # paints on top of it. The class gives CSS something to reserve height
+    # against.
+    cls = "tbl-s" if height <= 320 else ("tbl-m" if height <= 460 else "tbl-l")
+    st.markdown(
+        f'<div class="tblwrap {cls}" style="max-height:{height}px">'
+        f'<table class="tbl"><thead><tr>{head}</tr></thead>'
+        f'<tbody>{"".join(rows)}</tbody></table></div>',
+        unsafe_allow_html=True)
+
+
 def fmt(n, dp=0):
     return f"{n:,.{dp}f}"
 
@@ -431,6 +467,9 @@ if VIEW == "cmd":
     </style>
     """, unsafe_allow_html=True)
     _n8 = min(8, n_plants)
+    # Stacked bars need more vertical room per row than a plain bar, so the
+    # two stacked cards show six plants rather than eight.
+    _n6 = min(6, n_plants)
     _top10 = sel.nsmallest(min(10, n_plants), "lips_rank")
     _share10 = _top10.nrw_m3.sum() / tot_nrw * 100 if tot_nrw else 0.0
 
@@ -452,7 +491,7 @@ if VIEW == "cmd":
                                "LIPS %{x:.1f}<extra></extra>")))
             f.update_xaxes(range=[0, 116], showgrid=True)
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=120))
+            chart(mini(f, h=152))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Ranks plants using multi-factor intervention scoring.</b></li>'
@@ -486,7 +525,7 @@ if VIEW == "cmd":
                                    "<br>%{y:.1f}% loss<extra></extra>")))
             f.update_xaxes(type="log", dtick=1)
             f.update_yaxes(ticksuffix="%")
-            chart(mini(f, h=104, legend=True))
+            chart(mini(f, h=142, legend=True))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Highlights divergence between percentage loss and absolute volume lost.</b></li>'
@@ -501,7 +540,7 @@ if VIEW == "cmd":
             st.markdown('<div class="card-t">3. What Drives Each Score</div>'
                         '<div class="card-s">LIPS component percentiles, weighted</div>',
                         unsafe_allow_html=True)
-            d_ = sel.nsmallest(_n8, "lips_rank").sort_values("lips")
+            d_ = sel.nsmallest(_n6, "lips_rank").sort_values("lips")
             f = go.Figure()
             for col, lab, c_ in [("pr_nrw_per_km_m3", "Loss density", T.BLUE),
                                  ("pr_bursts_per_100km", "Burst rate", T.ORANGE),
@@ -515,7 +554,7 @@ if VIEW == "cmd":
                                        "percentile %{x:.0f}<extra></extra>")))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=104, legend=True))
+            chart(mini(f, h=142, legend=True))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Deconstructs LIPS priority into four core factors.</b></li>'
@@ -538,7 +577,7 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%",
                            range=[mo.pct.min() - 1.0, mo.pct.max() + 1.0])
             f.update_xaxes(dtick=2, showgrid=False)
-            chart(mini(f, h=120))
+            chart(mini(f, h=152))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Tracks systemic NRW percentage fluctuations over the current year.</b></li>'
@@ -568,7 +607,7 @@ if VIEW == "cmd":
                              font=dict(size=11, color=T.INK))
             f.update_yaxes(range=[0, 104], ticksuffix="%")
             f.update_xaxes(showgrid=False)
-            chart(mini(f, h=120))
+            chart(mini(f, h=152))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Illustrates the Pareto principle (80/20 rule) in total water loss.</b></li>'
@@ -580,7 +619,7 @@ if VIEW == "cmd":
             st.markdown('<div class="card-t">6. Loss Composition</div>'
                         '<div class="card-s">Largest plants &middot; physical vs commercial split</div>',
                         unsafe_allow_html=True)
-            d_ = sel.nlargest(_n8, "nrw_m3").sort_values("nrw_m3")
+            d_ = sel.nlargest(_n6, "nrw_m3").sort_values("nrw_m3")
             f = go.Figure()
             f.add_trace(go.Bar(
                 x=d_.physical_loss_m3, y=d_.plant, orientation="h",
@@ -595,7 +634,7 @@ if VIEW == "cmd":
                 hovertemplate="<b>%{y}</b><br>%{x:,.0f} m³<extra></extra>"))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=104, legend=True))
+            chart(mini(f, h=142, legend=True))
             st.markdown(
                 '<ul class="ov-bullets">'
                 '<li><b>Differentiates physical pipe leaks from commercial metering/billing issues.</b></li>'
@@ -697,20 +736,21 @@ if VIEW in SEC_PRIORITY:
             ["lips_rank", "plant", "district", "area_type", "lips",
              "nrw_per_km_m3", "bursts_per_100km", "plant_age_yr", "account_density",
              "nrw_m3", "nrw_pct", "volume_rank", "rate_rank"]]
-        st.dataframe(
-            sched, width='stretch', hide_index=True, height=545,
-            column_config={
-                "lips_rank": st.column_config.NumberColumn("Priority", width="small"),
-                "plant": "Plant", "district": "District", "area_type": "Area",
-                "lips": st.column_config.ProgressColumn("LIPS Score", min_value=0, max_value=100, format="%.1f"),
-                "nrw_per_km_m3": st.column_config.NumberColumn("Loss Density (m³/km)", format="%,d"),
-                "bursts_per_100km": st.column_config.NumberColumn("Bursts /100km", format="%.1f"),
-                "plant_age_yr": st.column_config.NumberColumn("Plant Age (yr)", format="%.0f"),
-                "account_density": st.column_config.NumberColumn("Acc Density (/km)", format="%.1f"),
-                "nrw_m3": st.column_config.NumberColumn("NRW m³", format="%,d"),
-                "nrw_pct": st.column_config.NumberColumn("Rate", format="%.1f%%"),
-                "volume_rank": st.column_config.NumberColumn("Vol Rank"),
-                "rate_rank": st.column_config.NumberColumn("Rate Rank")})
+        table(sched, [
+            ("lips_rank", "Priority", lambda v: f"{int(v)}"),
+            ("plant", "Plant", str),
+            ("district", "District", str),
+            ("area_type", "Area", str),
+            ("lips", "LIPS Score", lambda v: f"{v:.1f}"),
+            ("nrw_per_km_m3", "Loss Density (m³/km)", lambda v: f"{v:,.0f}"),
+            ("bursts_per_100km", "Bursts /100km", lambda v: f"{v:.1f}"),
+            ("plant_age_yr", "Plant Age (yr)", lambda v: f"{v:.0f}"),
+            ("account_density", "Acc Density (/km)", lambda v: f"{v:.1f}"),
+            ("nrw_m3", "NRW m³", lambda v: f"{v:,.0f}"),
+            ("nrw_pct", "Rate", lambda v: f"{v:.1f}%"),
+            ("volume_rank", "Vol Rank", lambda v: f"{int(v)}"),
+            ("rate_rank", "Rate Rank", lambda v: f"{int(v)}"),
+        ], height=530, bar="lips")
         st.download_button("Download schedule (CSV)", sched.to_csv(index=False),
                            f"paip_lips_schedule_{year}.csv", "text/csv")
 
@@ -1045,8 +1085,7 @@ if VIEW in SEC_PLANT:
                               f"{p.step_shift_pp:+.2f} pp (p={p.step_p:.3f})",
                               f"{int(p.anomaly_months)}",
                               f"{p.volatility_pp:.2f} pp"]})
-                st.dataframe(sig, width='stretch', hide_index=True,
-                             height=300)
+                table(sig, [(c, c, str) for c in sig.columns], height=300)
                 st.markdown('<div class="caption">A negative trend means '
                             'improving. p-values above 0.05 mean the movement is '
                             'not distinguishable from noise.</div>',
@@ -1086,17 +1125,17 @@ if VIEW in SEC_PLANT:
             cols = ["date", "production_m3", "billed_m3", "nrw_m3", "nrw_pct",
                     "physical_loss_m3", "commercial_loss_m3", "pipe_bursts",
                     "complaints", "pressure_bar", "rainfall_mm", "nrw_value_rm"]
-            st.dataframe(hist[cols], width='stretch', hide_index=True,
-                         column_config={
-                             "date": st.column_config.DateColumn("Month", format="MMM YYYY"),
-                             "production_m3": st.column_config.NumberColumn("Production m³", format="%,d"),
-                             "billed_m3": st.column_config.NumberColumn("Billed m³", format="%,d"),
-                             "nrw_m3": st.column_config.NumberColumn("NRW m³", format="%,d"),
-                             "nrw_pct": st.column_config.NumberColumn("Rate", format="%.1f%%"),
-                             "physical_loss_m3": st.column_config.NumberColumn("Physical m³", format="%,d"),
-                             "commercial_loss_m3": st.column_config.NumberColumn("Commercial m³", format="%,d"),
-                             "pipe_bursts": st.column_config.NumberColumn("Bursts"),
-                             "complaints": st.column_config.NumberColumn("Complaints"),
-                             "pressure_bar": st.column_config.NumberColumn("Pressure bar", format="%.2f"),
-                             "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%,d"),
-                             "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d")})
+            table(hist[cols], [
+                ("date", "Month", lambda v: pd.to_datetime(v).strftime("%b %Y")),
+                ("production_m3", "Production m³", lambda v: f"{v:,.0f}"),
+                ("billed_m3", "Billed m³", lambda v: f"{v:,.0f}"),
+                ("nrw_m3", "NRW m³", lambda v: f"{v:,.0f}"),
+                ("nrw_pct", "Rate", lambda v: f"{v:.1f}%"),
+                ("physical_loss_m3", "Physical m³", lambda v: f"{v:,.0f}"),
+                ("commercial_loss_m3", "Commercial m³", lambda v: f"{v:,.0f}"),
+                ("pipe_bursts", "Bursts", lambda v: f"{int(v)}"),
+                ("complaints", "Complaints", lambda v: f"{int(v)}"),
+                ("pressure_bar", "Pressure bar", lambda v: f"{v:.2f}"),
+                ("rainfall_mm", "Rain mm", lambda v: f"{v:,.0f}"),
+                ("nrw_value_rm", "Value RM", lambda v: f"{v:,.0f}"),
+            ], height=420)
