@@ -454,16 +454,18 @@ if VIEW == "cmd":
     .card-s { margin-bottom: 0.2rem !important; font-size: 0.68rem !important; opacity: 0.8; }
     
     /* Explanation Box & Text styling */
-    .ov-bullets { 
-        margin: 0.2rem 0 0 0 !important; 
-        padding: 0.35rem 0.5rem 0.35rem 1.2rem !important; 
-        font-size: 0.68rem !important; 
-        line-height: 1.2 !important; 
-        background-color: rgba(127, 127, 127, 0.08); 
+    .ov-line {
+        margin: 0.2rem 0 0 0 !important;
+        padding: 0.3rem 0.5rem !important;
+        font-size: 0.68rem !important;
+        line-height: 1.2 !important;
+        background-color: rgba(127, 127, 127, 0.08);
         border-radius: 4px;
         border-left: 3px solid #0066cc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .ov-bullets li { margin-bottom: 0.15rem !important; }
     </style>
     """, unsafe_allow_html=True)
     _n8 = min(8, n_plants)
@@ -493,10 +495,8 @@ if VIEW == "cmd":
             f.update_yaxes(showgrid=False)
             chart(mini(f, h=152))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Ranks plants using multi-factor intervention scoring.</b></li>'
-                '<li>Focuses immediate field intervention resources on high-scoring plants to maximize operational impact.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Shows which plants need repair first.</div>',
+                unsafe_allow_html=True)
 
     with r1[1]:
         with st.container(border=True):
@@ -527,10 +527,8 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%")
             chart(mini(f, h=142, legend=True))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Highlights divergence between percentage loss and absolute volume lost.</b></li>'
-                '<li>Prevents misallocation of resources toward small plants with high percentage rates but minimal volume.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Compares small % losses vs big volume losses.</div>',
+                unsafe_allow_html=True)
 
     # Row 2: Graphs 3 & 4
     r2 = st.columns(2)
@@ -556,10 +554,8 @@ if VIEW == "cmd":
             f.update_yaxes(showgrid=False)
             chart(mini(f, h=142, legend=True))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Deconstructs LIPS priority into four core factors.</b></li>'
-                '<li>Details specific contributing risk drivers (Loss Density, Burst Rate, Plant Age, Account Density) per plant.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Shows what factors drive each plant\'s score.</div>',
+                unsafe_allow_html=True)
 
     with r2[1]:
         with st.container(border=True):
@@ -579,10 +575,8 @@ if VIEW == "cmd":
             f.update_xaxes(dtick=2, showgrid=False)
             chart(mini(f, h=152))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Tracks systemic NRW percentage fluctuations over the current year.</b></li>'
-                '<li>Identifies operational seasonality and system-wide improvement or deterioration patterns over time.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Tracks how water loss changed this year.</div>',
+                unsafe_allow_html=True)
 
     # Row 3: Graphs 5 & 6
     r3 = st.columns(2)
@@ -609,10 +603,8 @@ if VIEW == "cmd":
             f.update_xaxes(showgrid=False)
             chart(mini(f, h=152))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Illustrates the Pareto principle (80/20 rule) in total water loss.</b></li>'
-                '<li>Demonstrates how targeted interventions on a minority of plants capture the majority of total losses.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Shows how few plants cause most of the loss.</div>',
+                unsafe_allow_html=True)
 
     with r3[1]:
         with st.container(border=True):
@@ -636,10 +628,8 @@ if VIEW == "cmd":
             f.update_yaxes(showgrid=False)
             chart(mini(f, h=142, legend=True))
             st.markdown(
-                '<ul class="ov-bullets">'
-                '<li><b>Differentiates physical pipe leaks from commercial metering/billing issues.</b></li>'
-                '<li>Guides team dispatching by assigning leak repair crews versus commercial auditing personnel appropriately.</li>'
-                '</ul>', unsafe_allow_html=True)
+                '<div class="ov-line">Splits losses into pipe leaks vs billing issues.</div>',
+                unsafe_allow_html=True)
 
 
 # ====================================================================
