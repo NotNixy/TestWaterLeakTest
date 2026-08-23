@@ -273,8 +273,6 @@ NAV = [
     ("PRIORITY", [("Ranking", "rank"),
                   ("Full schedule", "sched"),
                   ("Recovery curve", "curve")]),
-    ("LOSS DYNAMIC", [("Rate vs volume", "ratevol"),
-                      ("Loss composition", "comp")]),
     ("PLANT PROFILE", [("Summary", "psum"),
                        ("What the model sees", "pmodel"),
                        ("History", "phist"),
