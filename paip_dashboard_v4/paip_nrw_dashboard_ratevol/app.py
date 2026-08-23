@@ -273,8 +273,6 @@ NAV = [
     ("PRIORITY", [("Ranking", "rank"),
                   ("Full schedule", "sched"),
                   ("Recovery curve", "curve")]),
-    ("LOSS DYNAMIC", [("Rate vs volume", "ratevol"),
-                      ("Loss composition", "comp")]),
     ("PLANT PROFILE", [("Summary", "psum"),
                        ("What the model sees", "pmodel"),
                        ("History", "phist"),
@@ -725,7 +723,7 @@ if VIEW in SEC_PRIORITY:
         gap_at_k = lips_at_k - rate_at_k
 
         st.markdown(T.callout(
-            f"📊 In the first <b>{k} plant{'s' if k != 1 else ''}</b> "
+            f" In the first <b>{k} plant{'s' if k != 1 else ''}</b> "
             f"(~{k / n_plants * 100:.0f}% of the programme), LIPS/volume order "
             f"recovers <b>{lips_at_k:.1f}%</b> of total NRW versus "
             f"<b>{rate_at_k:.1f}%</b> for rate order — a "
@@ -776,156 +774,6 @@ if VIEW in SEC_PRIORITY:
 # Loss Dynamic tab
 # ==========================================================================
 
-if VIEW in SEC_LOSS:
-    if VIEW == "ratevol":
-        st.markdown("### Two measures, two different repair queues")
-
-        rho = spearmanr(sel.nrw_pct, sel.nrw_m3).statistic
-        tau = kendalltau(sel.rate_rank, sel.volume_rank).statistic
-        n_top = min(10, n_plants)
-        top_rate = sel.nsmallest(n_top, "rate_rank")
-        top_vol = sel.nsmallest(n_top, "volume_rank")
-        overlap = len(set(top_rate.plant) & set(top_vol.plant))
-        w_rate, w_vol = top_rate.nrw_m3.sum(), top_vol.nrw_m3.sum()
-        ratio = w_vol / w_rate if w_rate else np.nan
-
-        st.markdown(T.callout(
-            f"Rate and volume rankings often disagree — the top-{n_top} queues "
-            f"share only <b>{overlap} plant{'s' if overlap != 1 else ''}</b>, and "
-            f"the volume queue covers <b>{ratio:.1f}× more water</b> for the same "
-            f"crew effort.",
-            "crit" if overlap <= 2 else "warn"), unsafe_allow_html=True)
-
-        c1, c2 = st.columns([1.25, 1])
-
-        with c1:
-            pl = sel.copy()
-            cond = [pl.plant.isin(set(top_rate.plant) & set(top_vol.plant)),
-                    pl.plant.isin(top_vol.plant), pl.plant.isin(top_rate.plant)]
-            pl["queue"] = np.select(
-                cond, [f"Both queues", f"Top {n_top} by volume", f"Top {n_top} by rate"],
-                default="Neither")
-
-            st.markdown('<div class="caption">📊 Shows where a plant\'s loss rate '
-                        'and total loss volume disagree, sized by water lost.</div>',
-                        unsafe_allow_html=True)
-
-            order = [f"Top {n_top} by volume", f"Top {n_top} by rate", "Both queues", "Neither"]
-            colors = {f"Top {n_top} by volume": T.BLUE, f"Top {n_top} by rate": T.ORANGE,
-                    "Both queues": T.AQUA, "Neither": T.NEUTRAL}
-
-            fig = go.Figure()
-            for grp in order:
-                g = pl[pl.queue == grp]
-                if g.empty:
-                    continue
-                fig.add_trace(go.Scatter(
-                    x=g.production_m3, y=g.nrw_pct, mode="markers", name=grp,
-                    marker=dict(size=np.sqrt(g.nrw_m3 / pl.nrw_m3.max()) * 44 + 7,
-                                color=colors[grp], opacity=0.85,
-                                line=dict(color=T.SURFACE, width=2)),
-                    customdata=np.stack([g.plant, g.district, g.nrw_m3,
-                                         g.volume_rank, g.rate_rank], -1),
-                    hovertemplate=("<b>%{customdata[0]}</b> · %{customdata[1]}<br>"
-                                   "Production  %{x:,.0f} m³<br>"
-                                   "Loss rate  %{y:.1f}%  (rank %{customdata[4]})<br>"
-                                   "NRW volume  %{customdata[2]:,.0f} m³  "
-                                   "(rank %{customdata[3]})<extra></extra>")))
-
-            lab = pl.nlargest(3, "nrw_m3")
-            for _, r in lab.iterrows():
-                radius = (np.sqrt(r.nrw_m3 / pl.nrw_m3.max()) * 44 + 7) / 2
-                fig.add_annotation(x=np.log10(r.production_m3), y=r.nrw_pct,
-                                   text=r.plant, showarrow=False,
-                                   yshift=-(radius + 14),
-                                   font=dict(size=10.5, color=T.INK_2),
-                                   bgcolor=T.SURFACE, opacity=0.9, borderpad=2)
-            fig.add_hline(y=T.POLICY_TARGET_PCT,
-                          line=dict(color=T.GOOD, width=1.2, dash="dash"),
-                          annotation_text="25% target",
-                          annotation_position="top left",
-                          annotation_font=dict(size=10.5, color=T.SUCCESS_TEXT))
-            fig.update_layout(
-                title="Loss rate against plant size — bubble area is NRW volume",
-                height=612,
-                xaxis=dict(title="Annual production (m³, log scale)", type="log",
-                           dtick=1, minor=dict(showgrid=False)),
-                yaxis=dict(title="Loss rate (% of production)", ticksuffix="%"))
-            chart(fig)
-
-        with c2:
-            st.markdown("###### How far plants move between the two rankings")
-            st.markdown('<div class="caption">📊 Shows how much each plant\'s '
-                        'rank shifts between the rate ranking and the volume ranking.</div>',
-                        unsafe_allow_html=True)
-            n_dumb = min(12, n_plants)
-            mv = sel.nsmallest(n_dumb, "volume_rank")[
-                ["plant", "rate_rank", "volume_rank", "nrw_m3", "nrw_pct"]].copy()
-            mv = mv.sort_values("volume_rank", ascending=False)
-
-            fig = go.Figure()
-            for _, r in mv.iterrows():
-                fig.add_trace(go.Scatter(
-                    x=[r.volume_rank, r.rate_rank], y=[r.plant, r.plant],
-                    mode="lines", line=dict(color=T.NEUTRAL, width=2.5),
-                    showlegend=False, hoverinfo="skip"))
-            fig.add_trace(go.Scatter(
-                x=mv.volume_rank, y=mv.plant, mode="markers", name="Rank by volume",
-                marker=dict(size=11, color=T.BLUE,
-                            line=dict(color=T.SURFACE, width=2)),
-                customdata=mv.nrw_m3,
-                hovertemplate=("<b>%{y}</b><br>Volume rank  %{x}<br>"
-                               "NRW  %{customdata:,.0f} m³<extra></extra>")))
-            fig.add_trace(go.Scatter(
-                x=mv.rate_rank, y=mv.plant, mode="markers+text", name="Rank by rate",
-                marker=dict(size=11, color=T.ORANGE,
-                            line=dict(color=T.SURFACE, width=2)),
-                text=[f"  {v}" for v in mv.rate_rank], textposition="middle right",
-                textfont=dict(size=10.5, color=T.MUTED),
-                customdata=mv.nrw_pct,
-                hovertemplate=("<b>%{y}</b><br>Rate rank  %{x}<br>"
-                               "Loss rate  %{customdata:.1f}%<extra></extra>")))
-            fig.update_layout(
-                title=f"The {len(mv)} largest-volume plants in each ranking",
-                height=612,
-                xaxis=dict(title="Rank among all plants (1 = highest priority)",
-                           range=[0, n_plants + 5]),
-                yaxis=dict(title=None, tickfont=dict(size=11)))
-            chart(fig)
-
-    if VIEW == "comp":
-        st.markdown("### Physical leakage versus commercial loss")
-        st.markdown(T.callout(
-            "Physical losses need pipe repair; commercial losses need metering "
-            "and billing fixes — the split decides which crew to send."),
-            unsafe_allow_html=True)
-        st.markdown('<div class="caption">📊 Splits each plant\'s water loss '
-                    'into physical leaks and commercial (billing) losses.</div>',
-                    unsafe_allow_html=True)
-
-        n_show = min(16, n_plants)
-        comp = sel.nlargest(n_show, "nrw_m3").sort_values("nrw_m3")
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=comp.physical_loss_m3, y=comp.plant, orientation="h",
-            name="Physical leakage", marker=dict(color=T.BLUE,
-                                                 line=dict(color=T.SURFACE, width=2)),
-            customdata=comp.physical_share_pct,
-            hovertemplate=("<b>%{y}</b><br>Physical  %{x:,.0f} m³ "
-                           "(%{customdata:.0f}% of loss)<extra></extra>")))
-        fig.add_trace(go.Bar(
-            x=comp.commercial_loss_m3, y=comp.plant, orientation="h",
-            name="Commercial loss", marker=dict(color=T.ORANGE,
-                                                line=dict(color=T.SURFACE, width=2)),
-            customdata=100 - comp.physical_share_pct,
-            hovertemplate=("<b>%{y}</b><br>Commercial  %{x:,.0f} m³ "
-                           "(%{customdata:.0f}% of loss)<extra></extra>")))
-        fig.update_layout(
-            title=f"Loss composition, {n_show} largest-loss plants", height=600,
-            barmode="stack", bargap=0.3,
-            xaxis=dict(title="Volume lost (m³)"),
-            yaxis=dict(title=None, tickfont=dict(size=11)))
-        chart(fig)
 
 
 # ==========================================================================
