@@ -1,0 +1,219 @@
+{
+  "target": "nrw_pct",
+  "n_records": 2664,
+  "n_plants": 74,
+  "n_features": 28,
+  "excluded_for_leakage": [
+    "billed_commercial_m3",
+    "billed_domestic_m3",
+    "billed_industrial_m3",
+    "billed_m3",
+    "billed_revenue_rm",
+    "commercial_loss_m3",
+    "commercial_share_pct",
+    "consumption_per_capita_l_day",
+    "loss_per_connection_l_day",
+    "nrw_m3",
+    "nrw_m3_per_day",
+    "nrw_pct",
+    "nrw_per_account_m3",
+    "nrw_per_km_m3",
+    "nrw_sunk_cost_rm",
+    "nrw_value_rm",
+    "operating_margin_pct",
+    "physical_loss_m3",
+    "physical_loss_per_km_m3",
+    "physical_loss_value_rm",
+    "physical_share_pct",
+    "revenue_per_account_rm",
+    "tariff_rm_m3"
+  ],
+  "cv_grouped_by_plant": {
+    "gb": {
+      "r2": 0.38352090690967555,
+      "mae": 5.354828371834668,
+      "rmse": 6.9745269966417975
+    },
+    "ridge": {
+      "r2": 0.4508365183041356,
+      "mae": 5.1621071069629085,
+      "rmse": 6.582735546198311
+    },
+    "mean": {
+      "r2": -0.03588332504869696,
+      "mae": 7.309120184803448,
+      "rmse": 9.04088623421057
+    },
+    "selected": "ridge"
+  },
+  "selected_model": "ridge",
+  "temporal_holdout_prior_years_to_focus": {
+    "gb": {
+      "r2": 0.6522965418693599,
+      "mae": 4.222350310754729,
+      "rmse": 5.15986419522769
+    },
+    "ridge": {
+      "r2": 0.6129980256440326,
+      "mae": 4.289236652130307,
+      "rmse": 5.443652033971826
+    },
+    "mean": {
+      "r2": -0.03964088191710502,
+      "mae": 7.543642206395587,
+      "rmse": 8.922271631448794
+    }
+  },
+  "focus_year": 2025,
+  "focus_year_months": 12,
+  "years_covered": [
+    2023,
+    2024,
+    2025
+  ],
+  "history_months": 36,
+  "temporal_caveat": "The temporal split shares plants between train and test, so a flexible model can memorise each plant's own loss level. Its R2 is therefore optimistic and is NOT the number used for the unexplained-loss residual. The plant-grouped CV above is the valid estimate, because there every prediction comes from a model that never saw that plant.",
+  "importances": [
+    {
+      "feature": "area_type",
+      "importance": 0.6249752043243322,
+      "std": 0.03126817305359152
+    },
+    {
+      "feature": "capacity_m3_day",
+      "importance": 0.5762709036145257,
+      "std": 0.0220577733608553
+    },
+    {
+      "feature": "staff_count",
+      "importance": 0.4792816533263782,
+      "std": 0.022732975946863482
+    },
+    {
+      "feature": "population_served",
+      "importance": 0.2603291671279618,
+      "std": 0.01248575738449955
+    },
+    {
+      "feature": "customer_accounts",
+      "importance": 0.15934302931274943,
+      "std": 0.008679619657683666
+    },
+    {
+      "feature": "plant_age_yr",
+      "importance": 0.09990317759509265,
+      "std": 0.010411311152234622
+    },
+    {
+      "feature": "capacity_utilisation_pct",
+      "importance": 0.0659377459486197,
+      "std": 0.006208478408807134
+    },
+    {
+      "feature": "bursts_per_100km",
+      "importance": 0.05398791620298948,
+      "std": 0.006234398577777666
+    },
+    {
+      "feature": "energy_intensity_kwh_m3",
+      "importance": 0.047946134371029986,
+      "std": 0.005329301289893107
+    },
+    {
+      "feature": "connections_per_km",
+      "importance": 0.04517849396464476,
+      "std": 0.0032338074969349316
+    },
+    {
+      "feature": "pipe_bursts",
+      "importance": 0.03356191524910343,
+      "std": 0.0029529790367918813
+    },
+    {
+      "feature": "region",
+      "importance": 0.03214347806612766,
+      "std": 0.005483327099174911
+    },
+    {
+      "feature": "supply_interruption_hr",
+      "importance": 0.030783881142174358,
+      "std": 0.0025144599494188774
+    },
+    {
+      "feature": "pipe_length_km",
+      "importance": 0.026210346819606368,
+      "std": 0.002059270373661414
+    },
+    {
+      "feature": "complaints",
+      "importance": 0.010485797474624886,
+      "std": 0.0008398834697779821
+    },
+    {
+      "feature": "pressure_bar",
+      "importance": 0.004560542843843486,
+      "std": 0.0018958542191512362
+    },
+    {
+      "feature": "complaints_per_1000_accounts",
+      "importance": 0.0033740506162397523,
+      "std": 0.0006435662259632705
+    },
+    {
+      "feature": "production_m3",
+      "importance": 0.002115435487729439,
+      "std": 0.007631152931301394
+    }
+  ],
+  "cluster_silhouette": {
+    "2": 0.2042204152781129,
+    "3": 0.1647386825848659,
+    "4": 0.16409813576825102,
+    "5": 0.16529068572265732,
+    "6": 0.1465046920318305
+  },
+  "cluster_k": 2,
+  "cluster_profile": [
+    {
+      "cluster": 0,
+      "name": "Sparse network \u00b7 high loss rate",
+      "action": "Network survey and monitoring",
+      "plants": 39,
+      "median_nrw_pct": 43.85735659841033,
+      "median_physical_share": 73.1997645964813,
+      "median_bursts_per_100km": 52.38095238095239,
+      "median_plant_age": 24.0,
+      "median_nrw_per_km": 29143.46153846154,
+      "total_nrw_m3": 28566547.0,
+      "silhouette": 0.2042204152781129
+    },
+    {
+      "cluster": 1,
+      "name": "Dense network \u00b7 low loss rate",
+      "action": "Network survey and monitoring",
+      "plants": 35,
+      "median_nrw_pct": 33.391001019364616,
+      "median_physical_share": 70.6999774557214,
+      "median_bursts_per_100km": 45.90163934426229,
+      "median_plant_age": 25.0,
+      "median_nrw_per_km": 45922.2,
+      "total_nrw_m3": 187965232.0,
+      "silhouette": 0.2042204152781129
+    }
+  ],
+  "criticality_weights": {
+    "unexplained": 40,
+    "deterioration": 30,
+    "trend": 30
+  },
+  "deterioration_summary": {
+    "plants_with_worsening_trend": 2,
+    "plants_with_significant_worsening": 0,
+    "plants_with_significant_step_increase": 0,
+    "plants_with_anomaly_months": 1,
+    "total_anomaly_months": 1,
+    "median_trend_pp_yr": -1.055907335907336,
+    "estate_is_improving": true
+  },
+  "seed": 42
+}
