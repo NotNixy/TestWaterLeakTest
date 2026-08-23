@@ -43,23 +43,15 @@ def detected_mode() -> str:
 
 
 _detected = detected_mode()
-# The appearance control lives in the top strip now; it is read from session
-# state here because the theme must be resolved before any CSS is emitted.
-# Light by default rather than Auto: a dashboard shown to an examiner, or
-# printed into a report, should not change appearance with whatever the
-# viewing machine happens to be set to. Auto is still offered.
 _pref = st.session_state.get("appearance", "Light")
 MODE = theme_mod.resolve_mode(_pref, _detected)
 T = theme_mod.Theme(MODE)
 st.markdown(T.css, unsafe_allow_html=True)
+st.markdown("<style>.card-t { font-weight: 700 !important; }</style>",
+            unsafe_allow_html=True)
 
 PLOT_CFG = {"displayModeBar": False, "responsive": True}
 
-# LIPS balances volume density, pipe condition, asset age, and account exposure:
-#   nrw_per_km_m3 (40%)    : Combined Loss Density (NRW volume concentration)
-#   bursts_per_100km (25%) : Burst Rate (Proxy for physical pipe failure)
-#   plant_age_yr (20%)     : Asset Condition / Deterioration risk
-#   account_density (15%)  : Commercial & Metering risk exposure
 LIPS_COMPONENTS = {
     "nrw_per_km_m3": ("Loss Density", "m³ of NRW lost per km of pipe network"),
     "bursts_per_100km": ("Burst Rate", "Pipe bursts recorded per 100 km"),
@@ -91,8 +83,6 @@ def load():
 
 @st.cache_data
 def load_ml():
-    """Model artefacts produced by train_models.py. Training is done offline so
-    the outputs are reproducible and auditable rather than refitted per click."""
     try:
         p = pd.read_csv(DATA / "ml_plant.csv")
         mm = pd.read_csv(DATA / "ml_monthly.csv", parse_dates=["date"])
@@ -104,9 +94,6 @@ def load_ml():
 
 @st.cache_data
 def cluster_at(k: int, yr: int):
-    """Re-run KMeans at a chosen k for a given year. Cheap (74 rows), and
-    separation is modest at every k, so the operator should be able to try
-    alternatives."""
     py = yearly[yearly.year == yr].copy()
     scored, profile, sil, best = tm.archetypes(py, k=k)
     return scored[["plant", "cluster", "archetype"]], profile, sil, best
@@ -114,8 +101,6 @@ def cluster_at(k: int, yr: int):
 
 @st.cache_data
 def load_burst():
-    """Artefacts from train_burst_model.py. Training happens offline so the
-    dashboard shows a fixed, auditable model rather than refitting per click."""
     try:
         p = pd.read_csv(DATA / "burst_predictions.csv", parse_dates=["date"])
         h = pd.read_csv(DATA / "burst_history.csv", parse_dates=["date"])
@@ -140,14 +125,11 @@ burst_pred, burst_hist, burst_metrics = load_burst()
 HAS_BURST = burst_pred is not None
 coverage = load_coverage()
 
-# Everything below derives its year range from the data, so a refresh that adds
-# 2026 needs no code change.
 YEARS = sorted(int(y) for y in monthly.year.unique())
 YEAR_MIN, YEAR_MAX = YEARS[0], YEARS[-1]
 YEAR_SPAN = f"{YEAR_MIN}" if YEAR_MIN == YEAR_MAX else f"{YEAR_MIN}–{YEAR_MAX}"
 ML_YEAR = int(ml_metrics.get("focus_year", YEAR_MAX)) if HAS_ML else None
 
-# Months observed per year, so partial years can be labelled and annualised.
 if coverage is not None:
     MONTHS_BY_YEAR = dict(zip(coverage.year.astype(int), coverage.months.astype(int)))
 else:
@@ -170,16 +152,10 @@ def percentile_rank(s):
 
 @st.cache_data
 def score_lips(df: pd.DataFrame, weights: tuple) -> pd.DataFrame:
-    """Rank plants using the 4-Factor Leakage Intervention Priority Score.
-
-    Calculates percentile ranks (0–100) for loss density, burst rate,
-    plant age, and account density within the active cohort.
-    """
     w = dict(weights)
     total = sum(w.values()) or 1
     out = df.copy()
 
-    # Ensure derived metric exists if not pre-computed in CSV
     if "account_density" not in out.columns and "customer_accounts" in out.columns and "pipe_length_km" in out.columns:
         out["account_density"] = out.customer_accounts / out.pipe_length_km
 
@@ -191,8 +167,6 @@ def score_lips(df: pd.DataFrame, weights: tuple) -> pd.DataFrame:
             score += pr * (wt / total)
 
     out["lips"] = score.round(2)
-
-    # Tie-breaking priority: LIPS Score -> NRW Loss Density -> Raw NRW Volume
     out = out.sort_values(["lips", "nrw_per_km_m3", "nrw_m3"], ascending=False)
     out["lips_rank"] = np.arange(1, len(out) + 1)
     out["volume_rank"] = out.nrw_m3.rank(ascending=False, method="first").astype(int)
@@ -202,7 +176,6 @@ def score_lips(df: pd.DataFrame, weights: tuple) -> pd.DataFrame:
 
 
 def chart(fig, **kw):
-    """Render a figure with its chrome forced, then hand it to Streamlit."""
     fig.update_layout(paper_bgcolor=T.SURFACE, plot_bgcolor=T.SURFACE)
     kw.setdefault("width", "stretch")
     kw.setdefault("config", PLOT_CFG)
@@ -211,7 +184,6 @@ def chart(fig, **kw):
 
 
 def card(title, sub_=None):
-    """A real bordered container with a title row, for the figure to sit in."""
     c = st.container(border=True)
     with c:
         st.markdown(f'<div class="card-t">{title}</div>'
@@ -225,8 +197,6 @@ def fmt(n, dp=0):
 
 
 def m3(n):
-    """Volumes span five orders of magnitude, so units are scaled per value.
-    Uppercase M for millions — a lowercase 'm' beside 'm³' reads as metres."""
     if abs(n) >= 1e9:
         return f"{n/1e9:,.2f}B"
     if abs(n) >= 1e6:
@@ -245,12 +215,24 @@ def rm(n):
 
 
 # ==========================================================================
-# Topbar
+# Topbar (Branding Moved Here)
 # ==========================================================================
 
-# The whole view map in one place. Section label, then (label, key) rows.
-# "Overview" is the single-screen summary; everything under it is the same
-# material at full size with the reasoning attached.
+top_col1, top_col2 = st.columns([0.08, 0.92])
+with top_col1:
+    st.image(ASSETS / "logo.png", width=54)
+with top_col2:
+    st.markdown('<div class="sb-brand" style="font-size: 1.5rem; font-weight: bold;">PENGURUSAN AIR PAHANG BERHAD</div>'
+                '<div class="sb-sub" style="font-size: 0.9rem;">Non-Revenue Water intervention targeting</div>',
+                unsafe_allow_html=True)
+
+st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
+
+
+# ==========================================================================
+# Sidebar (Filters & Nav)
+# ==========================================================================
+
 NAV = [
     ("OVERVIEW", [("At a glance", "cmd")]),
     ("PRIORITY", [("Ranking", "rank"),
@@ -269,9 +251,6 @@ SEC_PLANT = {"psum", "pmodel", "phist"}
 if "view" not in st.session_state:
     st.session_state.view = "cmd"
 
-# Filters live in the sidebar so the main plane keeps every one of its ~900
-# usable vertical pixels for content, and so one filter row scopes every view
-# rather than each card carrying its own controls.
 with st.sidebar:
     _b = st.columns([0.36, 0.64])
     with _b[0]:
@@ -282,26 +261,17 @@ with st.sidebar:
                     unsafe_allow_html=True)
     st.markdown('<div class="waverule"></div>', unsafe_allow_html=True)
 
-    # Labels are the widgets' own, not markdown divs above them: Streamlit
-    # collapses a markdown container that sits directly before a widget, and
-    # the widget then paints over the heading.
     year = st.selectbox("Reporting year", sorted(YEARS, reverse=True), index=0,
                         format_func=year_label)
 
-    # One compact trigger that opens a checkbox panel, rather than three tall
-    # multiselects stacked down the rail. Nothing ticked means no filter, so
-    # the common case ("everything") needs no state and shows no chips.
-    _r_all = sorted(yearly.region.unique())
+    _p_all = sorted(yearly.plant.unique())
     _d_all = sorted(yearly.district.unique())
-    _a_all = sorted(yearly.area_type.unique())
 
     def _picked(prefix, options):
-        """Ticked boxes, or every option when none is ticked."""
         on = [o for o in options if st.session_state.get(f"{prefix}{o}", False)]
         return on or list(options)
 
-    _n_on = sum(1 for pre, opts in (("f_r_", _r_all), ("f_d_", _d_all),
-                                    ("f_a_", _a_all))
+    _n_on = sum(1 for pre, opts in (("f_p_", _p_all), ("f_d_", _d_all))
                 for o in opts if st.session_state.get(f"{pre}{o}", False))
     _label = f"Filters · {_n_on}" if _n_on else "Filters"
 
@@ -310,19 +280,14 @@ with st.sidebar:
                     'everything.</div>', unsafe_allow_html=True)
 
         def _clear():
-            # Same reason as the nav buttons: a body-level st.rerun() here
-            # would abort before the Appearance radio registers and silently
-            # reset the theme.
-            for pre, opts in (("f_r_", _r_all), ("f_d_", _d_all),
-                              ("f_a_", _a_all)):
+            for pre, opts in (("f_p_", _p_all), ("f_d_", _d_all)):
                 for o in opts:
                     st.session_state[f"{pre}{o}"] = False
 
         st.button("Clear all", key="f_clear", type="tertiary", on_click=_clear)
 
-        for _title, _pre, _opts, _cols in (("Region", "f_r_", _r_all, 4),
-                                           ("District", "f_d_", _d_all, 4),
-                                           ("Area type", "f_a_", _a_all, 4)):
+        for _title, _pre, _opts, _cols in (("Plant Name", "f_p_", _p_all, 4),
+                                           ("District", "f_d_", _d_all, 4)):
             st.markdown(f'<div class="pop-s">{_title}</div>',
                         unsafe_allow_html=True)
             _cc = st.columns(_cols)
@@ -330,18 +295,11 @@ with st.sidebar:
                 with _cc[_i % _cols]:
                     st.checkbox(_o, key=f"{_pre}{_o}")
 
-    regions = _picked("f_r_", _r_all)
-    # District options are not narrowed by region here: the panel shows every
-    # district at once, and a district outside the chosen regions simply
-    # intersects to nothing, which the empty-selection guard already reports.
+    plants = _picked("f_p_", _p_all)
     districts = _picked("f_d_", _d_all)
-    areas = _picked("f_a_", _a_all)
 
     st.markdown('<div class="waverule"></div>', unsafe_allow_html=True)
 
-    # Navigation. Buttons rather than a radio group because the sections need
-    # headings between them, and a single radio cannot carry those; this also
-    # gives the active row its own styling hook.
     def _go(k):
         st.session_state.view = k
 
@@ -352,12 +310,6 @@ with st.sidebar:
             st.markdown(
                 f'<div class="nav-row{" nav-on" if _active else ""}"></div>',
                 unsafe_allow_html=True)
-            # on_click, NOT a body-level st.rerun(). st.rerun() aborts the
-            # script at this point, so the Appearance radio further down never
-            # registers on that run — Streamlit then garbage-collects its
-            # widget state, and the next run falls back to the "Light" default.
-            # Navigating silently reset the theme. A callback runs before the
-            # script body instead, so every widget still registers.
             st.button(_label, key=f"nav_{_key}", width="stretch",
                       type="primary" if _active else "tertiary",
                       on_click=_go, args=(_key,))
@@ -375,11 +327,9 @@ if is_partial(year):
         f'actuals; charts comparing years annualise them. Rates are unaffected.'
         f'</div>', unsafe_allow_html=True)
 
-mask = (yearly.year == year) & yearly.region.isin(regions) \
-       & yearly.district.isin(districts) & yearly.area_type.isin(areas)
+mask = (yearly.year == year) & yearly.plant.isin(plants) & yearly.district.isin(districts)
 sel = yearly[mask].copy()
-mmask = (monthly.year == year) & monthly.region.isin(regions) \
-        & monthly.district.isin(districts) & monthly.area_type.isin(areas)
+mmask = (monthly.year == year) & monthly.plant.isin(plants) & monthly.district.isin(districts)
 msel = monthly[mmask].copy()
 
 if sel.empty:
@@ -387,8 +337,6 @@ if sel.empty:
              "Scope in the sidebar.")
     st.stop()
 
-# The models are fitted for one focus year. Merging those scores onto another
-# year would mislabel them, so they attach only when the year matches.
 ML_COLS = ["criticality", "criticality_rank", "unexplained_pp", "unexplained_m3", "expected_nrw_pct", "actual_nrw_pct","trend_pp_yr", "trend_p", "trend_recent_pp_yr", "step_shift_pp","step_p", "anomaly_months", "worst_z", "anomaly_score",
             "archetype", "cluster", "projected_nrw_pct_12m",
            "projected_extra_m3", "volatility_pp", "latest_nrw_pct",
@@ -400,11 +348,6 @@ elif HAS_ML:
     for c in ML_COLS:
         sel[c] = np.nan
 
-# LIPS weights are fixed in DEFAULT_WEIGHTS rather than exposed as sliders: a
-# priority score that changes when the viewer drags a control is not a queue,
-# it is an opinion generator. The model-based Criticality Index is deliberately
-# NOT folded in either — it measures how abnormal a plant looks, not how urgent
-# it is, and the Plant Profile keeps it as a separate signal.
 weights = dict(DEFAULT_WEIGHTS)
 lips_weights = dict(weights)
 sel = score_lips(sel, tuple(sorted(lips_weights.items())))
@@ -419,14 +362,6 @@ n_plants = len(sel)
 prev = yearly[(yearly.year == year - 1) & yearly.plant.isin(sel.plant)]
 prev_pct = (prev.nrw_m3.sum() / prev.production_m3.sum() * 100) if len(prev) else np.nan
 
-
-# ==========================================================================
-# Header
-# ==========================================================================
-
-# One slim strip instead of a title block plus tall tiles: on a 1080p screen
-# the old header consumed 320px, over a third of the viewport, before any
-# content appeared. This does the same job in about 110px.
 above = int((sel.nrw_pct > T.POLICY_TARGET_PCT).sum())
 delta = ""
 if not np.isnan(prev_pct):
@@ -435,9 +370,6 @@ if not np.isnan(prev_pct):
     delta = (f'<span class="{_cls}">{"↓" if _d < 0 else "↑"} '
              f'{abs(_d):.2f} pp</span> vs {year-1}')
 
-# Five tiles, one rail — the shape the reference dashboards use. Each is a
-# stat tile rather than a chart because each is a single number: a one-bar bar
-# chart would be the anti-pattern.
 _top10_share = (sel.nsmallest(min(10, n_plants), "lips_rank").nrw_m3.sum()
                 / tot_nrw * 100) if tot_nrw else 0.0
 _flagged = int(burst_pred.flag.sum()) if HAS_BURST and "flag" in burst_pred else 0
@@ -452,12 +384,10 @@ _cells = "".join(
     for l, v, s_ in _kpis)
 st.markdown(f'<div class="kpistrip">{_cells}</div>', unsafe_allow_html=True)
 
-
 VIEW = st.session_state.view
 
 
 def mini(fig, h=214, ylab=None, xlab=None, legend=False):
-    """Size a figure for a card. The title lives in the card, not the figure."""
     fig.update_layout(
         height=h, margin=dict(l=2, r=10, t=22 if legend else 4, b=2),
         title=None,
@@ -473,49 +403,48 @@ def mini(fig, h=214, ylab=None, xlab=None, legend=False):
 
 
 # ==========================================================================
-# Overview tab
+# Overview tab (Limited to 6 Graphs with Bullet Explanations)
 # ==========================================================================
 if VIEW == "cmd":
-    # Nine cards, but deliberately NOT a uniform 3x3. Column widths vary and
-    # one slot is a number rather than a plot, so the eye has somewhere to
-    # land first; an even grid of equal cards reads as a spreadsheet.
-    #
-    # Colour is cut to three roles here. BLUE is "this is the measure", ORANGE
-    # appears only where a genuine second series is being contrasted, and grey
-    # carries context. The one exception is the component card, where the four
-    # LIPS factors are true categories and need their own hues, and the burst
-    # card, where the colours mean good/bad and come from the status palette.
+    st.markdown("""
+    <style>
+    /* Tighten page padding and container gaps */
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    div[data-testid="stVerticalBlockBorderWrapper"] { padding: 0.35rem 0.5rem !important; overflow: hidden; }
+    div[data-testid="stVerticalBlock"] { gap: 0.2rem !important; }
+    
+    /* Card headers */
+    .card-t { margin-bottom: 0 !important; font-size: 0.95rem !important; line-height: 1.1 !important; }
+    .card-s { margin-bottom: 0.2rem !important; font-size: 0.68rem !important; opacity: 0.8; }
+    
+    /* Explanation Box & Text styling */
+    .ov-bullets { 
+        margin: 0.2rem 0 0 0 !important; 
+        padding: 0.35rem 0.5rem 0.35rem 1.2rem !important; 
+        font-size: 0.68rem !important; 
+        line-height: 1.2 !important; 
+        background-color: rgba(127, 127, 127, 0.08); 
+        border-radius: 4px;
+        border-left: 3px solid #0066cc;
+    }
+    .ov-bullets li { margin-bottom: 0.15rem !important; }
+    </style>
+    """, unsafe_allow_html=True)
     _n8 = min(8, n_plants)
     _top10 = sel.nsmallest(min(10, n_plants), "lips_rank")
     _share10 = _top10.nrw_m3.sum() / tot_nrw * 100 if tot_nrw else 0.0
 
-    r1 = st.columns([0.78, 1.42, 1.2])
+    # Row 1: Graphs 1 & 2
+    r1 = st.columns(2)
 
     with r1[0]:
-        # The hero. A single number is not a chart — a one-bar bar chart here
-        # would be the anti-pattern.
         with st.container(border=True):
-            st.markdown(
-                f'<div class="card-t">Where the water is</div>'
-                f'<div class="card-s">Top 10 priority plants, share of all NRW</div>'
-                f'<div class="hero-v">{_share10:.0f}<span class="hero-u">%</span></div>'
-                f'<div class="hero-s">{m3(_top10.nrw_m3.sum())} m³ of '
-                f'{m3(tot_nrw)} m³, in {len(_top10)} of {n_plants} plants.<br>'
-                f'Worst plant: <b>{_top10.iloc[0].plant}</b>, LIPS '
-                f'{_top10.iloc[0].lips:.0f}.</div>',
-                unsafe_allow_html=True)
-
-    with r1[1]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">Priority queue</div>'
+            st.markdown('<div class="card-t">1. Priority Queue</div>'
                         f'<div class="card-s">Top {_n8} plants by LIPS</div>',
                         unsafe_allow_html=True)
             d_ = sel.nsmallest(_n8, "lips_rank").sort_values("lips")
             f = go.Figure(go.Bar(
                 x=d_.lips, y=d_.plant, orientation="h",
-                # One series, one colour. Shading each bar darker-where-bigger
-                # would double-encode length as hue and spend the only free
-                # channel on information the bar already carries.
                 marker=dict(color=T.BLUE, line=dict(width=0)),
                 text=[f"{v:.0f}" for v in d_.lips], textposition="outside",
                 textfont=dict(size=10.5, color=T.INK_2), customdata=d_.district,
@@ -523,13 +452,18 @@ if VIEW == "cmd":
                                "LIPS %{x:.1f}<extra></extra>")))
             f.update_xaxes(range=[0, 116], showgrid=True)
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=196))
+            chart(mini(f, h=120))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Ranks plants using multi-factor intervention scoring.</b></li>'
+                '<li>Focuses immediate field intervention resources on high-scoring plants to maximize operational impact.</li>'
+                '</ul>', unsafe_allow_html=True)
 
-    with r1[2]:
+    with r1[1]:
         with st.container(border=True):
-            st.markdown('<div class="card-t">Rate vs volume</div>'
-                        '<div class="card-s">The two measures rank plants '
-                        'oppositely</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-t">2. Rate vs Volume</div>'
+                        '<div class="card-s">Comparing percentage loss against total volume</div>',
+                        unsafe_allow_html=True)
             tr_ = sel.nsmallest(10, "rate_rank")
             tv_ = sel.nsmallest(10, "volume_rank")
             pl_ = sel.copy()
@@ -552,15 +486,21 @@ if VIEW == "cmd":
                                    "<br>%{y:.1f}% loss<extra></extra>")))
             f.update_xaxes(type="log", dtick=1)
             f.update_yaxes(ticksuffix="%")
-            chart(mini(f, h=178, legend=True))
+            chart(mini(f, h=104, legend=True))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Highlights divergence between percentage loss and absolute volume lost.</b></li>'
+                '<li>Prevents misallocation of resources toward small plants with high percentage rates but minimal volume.</li>'
+                '</ul>', unsafe_allow_html=True)
 
-    r2 = st.columns([1.2, 1, 1.2])
+    # Row 2: Graphs 3 & 4
+    r2 = st.columns(2)
 
     with r2[0]:
         with st.container(border=True):
-            st.markdown('<div class="card-t">What drives each score</div>'
-                        '<div class="card-s">LIPS component percentiles, '
-                        'weighted</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-t">3. What Drives Each Score</div>'
+                        '<div class="card-s">LIPS component percentiles, weighted</div>',
+                        unsafe_allow_html=True)
             d_ = sel.nsmallest(_n8, "lips_rank").sort_values("lips")
             f = go.Figure()
             for col, lab, c_ in [("pr_nrw_per_km_m3", "Loss density", T.BLUE),
@@ -570,19 +510,21 @@ if VIEW == "cmd":
                 if col in d_.columns:
                     f.add_trace(go.Bar(
                         x=d_[col], y=d_.plant, orientation="h", name=lab,
-                        # A 2px surface gap separates the segments; a drawn
-                        # border around each would be the anti-pattern.
-                        marker=dict(color=c_,
-                                    line=dict(color=T.SURFACE, width=2)),
+                        marker=dict(color=c_, line=dict(color=T.SURFACE, width=2)),
                         hovertemplate=(f"<b>%{{y}}</b><br>{lab} "
                                        "percentile %{x:.0f}<extra></extra>")))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=178, legend=True))
+            chart(mini(f, h=104, legend=True))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Deconstructs LIPS priority into four core factors.</b></li>'
+                '<li>Details specific contributing risk drivers (Loss Density, Burst Rate, Plant Age, Account Density) per plant.</li>'
+                '</ul>', unsafe_allow_html=True)
 
     with r2[1]:
         with st.container(border=True):
-            st.markdown(f'<div class="card-t">Monthly loss rate</div>'
+            st.markdown(f'<div class="card-t">4. Monthly Loss Rate</div>'
                         f'<div class="card-s">{year}, system-wide</div>',
                         unsafe_allow_html=True)
             mo = (msel.groupby("month", as_index=False)
@@ -596,13 +538,21 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%",
                            range=[mo.pct.min() - 1.0, mo.pct.max() + 1.0])
             f.update_xaxes(dtick=2, showgrid=False)
-            chart(mini(f, h=196))
+            chart(mini(f, h=120))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Tracks systemic NRW percentage fluctuations over the current year.</b></li>'
+                '<li>Identifies operational seasonality and system-wide improvement or deterioration patterns over time.</li>'
+                '</ul>', unsafe_allow_html=True)
 
-    with r2[2]:
+    # Row 3: Graphs 5 & 6
+    r3 = st.columns(2)
+
+    with r3[0]:
         with st.container(border=True):
-            st.markdown('<div class="card-t">Loss concentration</div>'
-                        '<div class="card-s">Cumulative share of NRW, plants '
-                        'ranked by volume</div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-t">5. Loss Concentration</div>'
+                        '<div class="card-s">Cumulative share of NRW, plants ranked by volume</div>',
+                        unsafe_allow_html=True)
             sv = sel.sort_values("nrw_m3", ascending=False).reset_index(drop=True)
             sv["cum"] = sv.nrw_m3.cumsum() / sel.nrw_m3.sum() * 100
             n10 = min(10, len(sv))
@@ -618,45 +568,17 @@ if VIEW == "cmd":
                              font=dict(size=11, color=T.INK))
             f.update_yaxes(range=[0, 104], ticksuffix="%")
             f.update_xaxes(showgrid=False)
-            chart(mini(f, h=196))
-
-    r3 = st.columns([1, 1.15, 1.25])
-
-    with r3[0]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">Burst risk</div>'
-                        '<div class="card-s">Predicted band, next month</div>',
-                        unsafe_allow_html=True)
-            if HAS_BURST:
-                bp = burst_pred.copy()
-                bands = [("Low", 0.0, 0.25, T.GOOD),
-                         ("Moderate", 0.25, 0.5, T.WARNING),
-                         ("High", 0.5, 0.75, T.SERIOUS),
-                         ("Critical", 0.75, 1.01, T.CRITICAL)]
-                xs = [b[0] for b in bands]
-                ys = [int(((bp.risk >= lo) & (bp.risk < hi)).sum())
-                      for _, lo, hi, _c in bands]
-                f = go.Figure(go.Bar(
-                    x=xs, y=ys,
-                    marker=dict(color=[b[3] for b in bands], line=dict(width=0)),
-                    text=ys, textposition="outside",
-                    textfont=dict(size=10.5, color=T.INK_2),
-                    hovertemplate="<b>%{x}</b><br>%{y} plants<extra></extra>"))
-                # Thin bars: these are the only saturated blocks on the screen
-                # and at full width they shouted over everything else.
-                f.update_layout(bargap=0.66)
-                f.update_yaxes(range=[0, max(ys) * 1.3 if max(ys) else 1],
-                               showgrid=False, showticklabels=False)
-                chart(mini(f, h=196))
-            else:
-                st.markdown('<div class="card-s">No burst model artefacts in '
-                            'this build.</div>', unsafe_allow_html=True)
+            chart(mini(f, h=120))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Illustrates the Pareto principle (80/20 rule) in total water loss.</b></li>'
+                '<li>Demonstrates how targeted interventions on a minority of plants capture the majority of total losses.</li>'
+                '</ul>', unsafe_allow_html=True)
 
     with r3[1]:
         with st.container(border=True):
-            st.markdown('<div class="card-t">Loss composition</div>'
-                        '<div class="card-s">Largest plants &middot; the split '
-                        'is PAIP&rsquo;s assumed apportionment</div>',
+            st.markdown('<div class="card-t">6. Loss Composition</div>'
+                        '<div class="card-s">Largest plants &middot; physical vs commercial split</div>',
                         unsafe_allow_html=True)
             d_ = sel.nlargest(_n8, "nrw_m3").sort_values("nrw_m3")
             f = go.Figure()
@@ -673,21 +595,13 @@ if VIEW == "cmd":
                 hovertemplate="<b>%{y}</b><br>%{x:,.0f} m³<extra></extra>"))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=178, legend=True))
+            chart(mini(f, h=104, legend=True))
+            st.markdown(
+                '<ul class="ov-bullets">'
+                '<li><b>Differentiates physical pipe leaks from commercial metering/billing issues.</b></li>'
+                '<li>Guides team dispatching by assigning leak repair crews versus commercial auditing personnel appropriately.</li>'
+                '</ul>', unsafe_allow_html=True)
 
-    with r3[2]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">Water lost by district</div>'
-                        '<div class="card-s">Total NRW volume</div>',
-                        unsafe_allow_html=True)
-            d_ = (sel.groupby("district", as_index=False)
-                     .agg(v=("nrw_m3", "sum")).sort_values("v"))
-            f = go.Figure(go.Bar(
-                x=d_.v, y=d_.district, orientation="h",
-                marker=dict(color=T.BLUE, line=dict(width=0)),
-                hovertemplate="<b>%{y}</b><br>%{x:,.0f} m³<extra></extra>"))
-            f.update_yaxes(showgrid=False)
-            chart(mini(f, h=196))
 
 # ====================================================================
 # Priority Tab
@@ -728,7 +642,6 @@ if VIEW in SEC_PRIORITY:
             chart(fig)
 
         with c2:
-            # Component breakdown chart showing percentiles for each factor
             fig = go.Figure()
             comp_cols = {
                 "pr_nrw_per_km_m3": ("Loss Density (40%)", T.BLUE),
@@ -803,15 +716,10 @@ if VIEW in SEC_PRIORITY:
 
 
 # ==========================================================================
-# Loss Dynamic (rate vs volume, then loss composition) tab
+# Loss Dynamic tab
 # ==========================================================================
 
 if VIEW in SEC_LOSS:
-    # A single view: the divergence IS the rate-versus-volume argument, so it
-    # no longer sits behind a sub-tab of its own. The two ranked queue tables
-    # were removed; the dumbbell already shows every plant's position in both
-    # rankings, and the full ordering is downloadable from the Priority
-    # Schedule.
     if VIEW == "ratevol":
         st.markdown("### Two measures, two different repair queues")
 
@@ -866,8 +774,6 @@ if VIEW in SEC_LOSS:
                                    "NRW volume  %{customdata[2]:,.0f} m³  "
                                    "(rank %{customdata[3]})<extra></extra>")))
 
-            # Direct-label only the largest few, offset below each bubble by its
-            # own radius so the text clears the mark.
             lab = pl.nlargest(3, "nrw_m3")
             for _, r in lab.iterrows():
                 radius = (np.sqrt(r.nrw_m3 / pl.nrw_m3.max()) * 44 + 7) / 2
@@ -891,9 +797,6 @@ if VIEW in SEC_LOSS:
 
         with c2:
             st.markdown("###### How far plants move between the two rankings")
-            # A dumbbell rather than a slope chart: giving every plant its own
-            # row keeps the labels legible, where a two-column slope chart packs
-            # volume ranks 1..n on top of each other.
             n_dumb = min(12, n_plants)
             mv = sel.nsmallest(n_dumb, "volume_rank")[
                 ["plant", "rate_rank", "volume_rank", "nrw_m3", "nrw_pct"]].copy()
@@ -1009,7 +912,6 @@ if VIEW in SEC_PLANT:
                              f"{p.bursts_per_100km:.1f} bursts per 100 km recorded"),
                       unsafe_allow_html=True)
 
-        # Burst-risk line for this plant, from the supervised classifier.
         if HAS_BURST:
             _b = burst_pred[burst_pred.plant == plant]
             if len(_b):
@@ -1196,5 +1098,5 @@ if VIEW in SEC_PLANT:
                              "pipe_bursts": st.column_config.NumberColumn("Bursts"),
                              "complaints": st.column_config.NumberColumn("Complaints"),
                              "pressure_bar": st.column_config.NumberColumn("Pressure bar", format="%.2f"),
-                             "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%.0f"),
+                             "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%,d"),
                              "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d")})
