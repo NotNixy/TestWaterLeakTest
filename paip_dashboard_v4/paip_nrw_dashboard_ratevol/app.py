@@ -1242,18 +1242,18 @@ if VIEW in SEC_PLANT:
         with chart_col1:
             fig_rate = go.Figure()
             fig_rate.add_trace(go.Scatter(
-                x=hist.date, y=hist.nrw_pct, mode="lines+markers", name=plant,
+                x=hist.date, y=hist.nrw_m3, mode="lines+markers", name=plant,
                 line=dict(color=T.BLUE, width=2)
             ))
             fig_rate.add_trace(go.Scatter(
-                x=hist2.date, y=hist2.nrw_pct, mode="lines+markers", name=p2_name,
+                x=hist2.date, y=hist2.nrw_m3, mode="lines+markers", name=p2_name,
                 line=dict(color=T.ORANGE, width=2)
             ))
             fig_rate.update_layout(
-                title="Loss Rate Trend Comparison (%)",
+                title="Water Loss Trend Comparison (m³)",
                 height=350,
                 xaxis=dict(title=None),
-                yaxis=dict(title="NRW Rate (%)", ticksuffix="%"),
+                yaxis=dict(title="Volume (m³)", ticksuffix="%"),
                 legend=dict(orientation="h", y=1.1)
             )
             chart(fig_rate)
