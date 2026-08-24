@@ -272,9 +272,9 @@ NAV = [
     ("OVERVIEW", [("At a glance", "cmd")]),
     ("PRIORITY", [("Ranking", "rank"),
                   ("Full schedule", "sched"),
-                  ("Recovery curve", "curve")]),
+                  ("Recovery curve", "curve"),]),
     ("PLANT PROFILE", [("Summary", "psum"),
-                       ("What the model sees", "pmodel"),
+                       ("Diagnosis", "pmodel"),
                        ("History", "phist"),
                       ("Comparison", "pcomp")]),
 ]
@@ -963,63 +963,108 @@ if VIEW in SEC_PLANT:
             st.info(f"No model output for {plant} in {year}. The expected-loss "
                     f"model is fitted for {ML_YEAR}.")
         else:
-            st.markdown("#### What the model sees at this plant")
+            st.markdown("### Root-Cause Diagnosis")
             pm_ml = ml_monthly[ml_monthly.plant == plant].sort_values("date")
-            c7, c8 = st.columns([1.5, 1])
+            
+            # --- 1. Operational KPI Strip (Driven by LIPS + ML Diagnostics) ---
+            gap_pp = float(p.unexplained_pp)
+            gap_m3 = float(p.unexplained_m3)
+            daily_m3_lost = max(0, gap_m3 / 365) if gap_m3 > 0 else 0
+
+            # Diagnostic Diagnosis based on ML baseline vs actual gap
+            if gap_pp > 3 and p.bursts_per_100km > 12:
+                verdict_title = "DIAGNOSIS: ACTIVE LEAKAGE"
+                rec_action = "Urgent dispatch — acoustic leak detection and pressure reduction."
+                action_bg = "rgba(239, 68, 68, 0.12)"
+                border_col = "#ef4444"
+            elif gap_pp > 3:
+                verdict_title = "DIAGNOSIS: COMMERCIAL ANOMALY"
+                rec_action = "Unaccounted volume — audit bulk meters and large accounts."
+                action_bg = "rgba(245, 158, 11, 0.12)"
+                border_col = "#f59e0b"
+            else:
+                verdict_title = "DIAGNOSIS: STRUCTURAL AGING"
+                rec_action = "Expected for network age — plan pipe replacement, not emergency response."
+                action_bg = "rgba(16, 185, 129, 0.12)"
+                border_col = "#10b981"
+
+            k1, k2, k3 = st.columns(3)
+            # Standard HTML superscript with a hover tooltip for k1
+            pp_label = 'pp <sup title="Percentage Points: Absolute difference between percentage values" style="cursor:pointer; color:#6b7280; font-weight:bold; font-size:18px">?</sup>'
+
+            k1.markdown(T.tile("Unexplained Deviation", f"{gap_pp:+.1f} {pp_label}", 
+                        "vs actual loss"), unsafe_allow_html=True)
+            k2.markdown(T.tile("Unaccounted Volume", f"{m3(gap_m3)} m³", 
+                               "volume annually"), unsafe_allow_html=True)
+            k3.markdown(T.tile("Daily Recovery Potential", f"{m3(daily_m3_lost)} m³", 
+                               "volume per day"), unsafe_allow_html=True)
+
+            # Diagnostic Action Banner
+            st.markdown(f'''
+            <div style="background:{action_bg}; padding: 0.8rem 1rem; border-radius: 6px; margin: 1rem 0; border-left: 5px solid {border_col};">
+                <span style="font-weight:700; font-size:0.95rem; color:{border_col};">{verdict_title}</span><br>
+                <span style="font-size:0.9rem;">{rec_action}</span>
+            </div>
+            ''', unsafe_allow_html=True)
+
+            # --- 2. Chart & Diagnostic Breakdown ---
+            c7, c8 = st.columns([1.6, 1])
             with c7:
                 fig = go.Figure()
+
                 fig.add_trace(go.Scatter(
                     x=pm_ml.date, y=pm_ml.predicted_nrw_pct, mode="lines",
-                    name="Expected from plant characteristics",
+                    name="Expected loss",
                     line=dict(color=T.ORANGE, width=2, dash="dash"),
-                    hovertemplate="%{x|%b %Y}<br>Expected  %{y:.1f}%<extra></extra>"))
+                    hovertemplate="%{x|%b %Y}<br>Expected loss: %{y:.1f}%<extra></extra>"))
                 fig.add_trace(go.Scatter(
                     x=pm_ml.date, y=pm_ml.nrw_pct, mode="lines",
-                    name="Actual", line=dict(color=T.BLUE, width=2.5),
-                    hovertemplate="%{x|%b %Y}<br>Actual  %{y:.1f}%<extra></extra>"))
+                    name="Actual loss", line=dict(color=T.BLUE, width=2.5),
+                    hovertemplate="%{x|%b %Y}<br>Actual loss: %{y:.1f}%<extra></extra>"))
                 an = pm_ml[pm_ml.is_anomaly.fillna(False).astype(bool)]
                 if len(an):
                     fig.add_trace(go.Scatter(
                         x=an.date, y=an.nrw_pct, mode="markers",
-                        name="Anomalous month",
-                        marker=dict(size=13, color=T.CRITICAL, symbol="circle-open",
+                        name="Unexplained loss spike",
+                        marker=dict(size=11, color=T.CRITICAL, symbol="circle-open",
                                     line=dict(width=2.5)),
-                        hovertemplate=("%{x|%b %Y}<br>Anomaly · robust z "
-                                       "%{customdata:.1f}<extra></extra>"),
-                        customdata=an.robust_z))
+                        hovertemplate="%{x|%b %Y}<br><b>Operational Anomaly Detected</b><br>Loss Rate: %{y:.1f}%<extra></extra>"))
+                  
                 fig.update_layout(
-                    title=f"{plant} — actual loss against model expectation",
-                    height=560, xaxis=dict(title=None),
-                    yaxis=dict(title="NRW (%)", ticksuffix="%"))
+                    title="<b>Actual Loss vs. Expected Loss</b>",
+                    height=380, xaxis=dict(title=None),
+                    yaxis=dict(title="NRW Loss Rate (%)", ticksuffix="%"),
+                    legend=dict(orientation="h", y=1.12))
                 chart(fig)
-                gap = float(p.unexplained_pp)
-                verdict = ("above" if gap > 0 else "below")
-                st.markdown(
-                    f'<div class="caption">This plant runs <b>{abs(gap):.1f} pp '
-                    f'{verdict}</b> what its network characteristics predict — '
-                    f'{abs(float(p.unexplained_m3)):,.0f} m³ a year '
-                    f'{"unaccounted for" if gap > 0 else "better than expected"}. '
-                    f'Pattern: <b>{p.archetype}</b>.</div>',
-                    unsafe_allow_html=True)
+                
             with c8:
+                st.markdown("##### **Model Diagnostic Breakdown**")
+                
+                trend_desc = "Rapid Deterioration" if p.trend_pp_yr > 1.0 else ("Gradual Rise" if p.trend_pp_yr > 0.2 else ("Improving" if p.trend_pp_yr < -0.2 else "Stable"))
+                shift_desc = "Sudden Burst / Loss Shift" if abs(p.step_shift_pp) > 2 else "Consistent Pattern"
                 sig = pd.DataFrame({
-                    "Signal": ["Criticality rank", "Unexplained loss",
-                               "Trend (36 mo)", "Recent trend (12 mo)",
-                               "Step change (last 6 mo)", "Anomalous months",
-                               "Month-to-month volatility"],
-                    "Value": [f"{int(p.criticality_rank)} of {n_plants}",
-                              f"{p.unexplained_pp:+.1f} pp",
-                              f"{p.trend_pp_yr:+.2f} pp/yr (p={p.trend_p:.3f})",
-                              f"{p.trend_recent_pp_yr:+.2f} pp/yr",
-                              f"{p.step_shift_pp:+.2f} pp (p={p.step_p:.3f})",
-                              f"{int(p.anomaly_months)}",
-                              f"{p.volatility_pp:.2f} pp"]})
-                st.dataframe(sig, width='stretch', hide_index=True,
-                             height=300)
-                st.markdown('<div class="caption">A negative trend means '
-                            'improving. p-values above 0.05 mean the movement is '
-                            'not distinguishable from noise.</div>',
-                            unsafe_allow_html=True)
+                    "Diagnostic Factor": [
+                        "Asset Behavior Profile",
+                        "Multi-Year Trajectory",
+                        "Recent Step Change (6 Mo)",
+                        "Flagged Anomaly Months",
+                        "Month-to-Month Stability"
+                    ],
+                    "Model Finding": [
+                        f"**{p.archetype}**",
+                        f"{trend_desc} ({p.trend_pp_yr:+.1f}%/yr)",
+                        f"{shift_desc}",
+                        f"{int(p.anomaly_months)} Month(s)",
+                        "Volatile" if p.volatility_pp > 3 else "Steady"
+                    ]
+                })
+                
+                st.dataframe(sig, use_container_width=True, hide_index=True, height=210)
+                
+                st.info(
+                    """💡 **How it works:** Learns each plant's expected loss from its profile (age, length, connections), 
+                    then flags drift from it — separating aging from real leaks or billing errors."""
+                )
 
     if VIEW == "phist":
         c3, c4 = st.columns(2)
