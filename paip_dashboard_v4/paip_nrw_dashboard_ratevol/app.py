@@ -79,7 +79,15 @@ def load():
     x = pd.read_csv(DATA / "plant_crosswalk.csv")
     q = pd.read_csv(DATA / "data_quality.csv")
     v = pd.read_csv(DATA / "missing_values.csv")
-    return m, y, x, q, v
+    pred_path = DATA / "lips_2026_prediction.csv"
+    df_priority = pd.read_csv(pred_path) if pred_path.exists() else None
+
+    backtest_path = DATA / "forecast_backtest.csv"
+    df_backtest = pd.read_csv(backtest_path) if backtest_path.exists() else None
+    if df_backtest is not None and df_backtest.empty:
+        df_backtest = None
+
+    return m, y, x, q, v, df_priority, df_backtest
 
 
 @st.cache_data
@@ -119,7 +127,7 @@ def load_coverage():
     return None
 
 
-monthly, yearly, crosswalk, quality, missing = load()
+monthly, yearly, crosswalk, quality, missing, prediction, forecast_backtest = load()
 ml_plant, ml_monthly, ml_metrics = load_ml()
 HAS_ML = ml_plant is not None
 burst_pred, burst_hist, burst_metrics = load_burst()
@@ -272,13 +280,14 @@ NAV = [
     ("OVERVIEW", [("At a glance", "cmd")]),
     ("PRIORITY", [("Ranking", "rank"),
                   ("Full schedule", "sched"),
-                  ("Recovery curve", "curve"),]),
+                  ("Recovery curve", "curve"),
+                  ("Prediction", "pred")]),
     ("PLANT PROFILE", [("Summary", "psum"),
                        ("Diagnosis", "pmodel"),
                        ("History", "phist"),
                       ("Comparison", "pcomp")]),
 ]
-SEC_PRIORITY = {"rank", "sched", "curve"}
+SEC_PRIORITY = {"rank", "sched", "curve", "pred}
 SEC_LOSS = {"ratevol", "comp"}
 SEC_PLANT = {"psum", "pmodel", "phist", "pcomp"}
 
@@ -777,12 +786,100 @@ if VIEW in SEC_PRIORITY:
         st.download_button("Download schedule (CSV)", sched.to_csv(index=False),
                            f"paip_lips_schedule_{year}.csv", "text/csv")
 
+    if VIEW == "pred":
+        st.markdown("### **LIPS 2026 Prediction**")
+        st.markdown("#### Projections account for compound pipe aging, burst rate escalation, and multi-year NRW trajectory trends.")
+        
+        # Priority Summary Metrics
+        escalated = len(prediction[prediction['rank_change'] > 1])
+        deescalated = len(prediction[prediction['rank_change'] < 1])
+        top_risk = prediction.sort_values('lips_rank_2026').iloc[0]['plant']
+        lips_pred = prediction.sort_values('lips_rank_2026').iloc[0]['lips']
+        
+        m = st.columns(4)
 
-# ==========================================================================
-# Loss Dynamic tab
-# ==========================================================================
+        m[0].markdown(T.tile("2026 #1 Priority Plant", top_risk, f"with projected LIPS score {lips_pred}"), unsafe_allow_html=True)
+
+        m[1].markdown(T.tile("Escalating Plants", f"{escalated} Plants"), unsafe_allow_html=True)
+
+        m[2].markdown(T.tile("Improving / Stable", f"{deescalated} Plants"), unsafe_allow_html=True)
+
+        if forecast_backtest is not None:
+            bt = forecast_backtest.iloc[0]
+            m[3].markdown(T.tile("Forecast Accuracy Score", f"{bt.top_n_precision_pct:.1f}%",
+                                  f"Top-{int(bt.top_n)} precision · backtest {bt.train_years} → {int(bt.holdout_year)}"),
+                          unsafe_allow_html=True)
+        else:
+            m[3].markdown(T.tile("Forecast Accuracy Score", "N/A", "Needs 2+ years of history to backtest"), unsafe_allow_html=True)
+
+        # k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
 
 
+        # 2026 Priority Table Display
+        st.markdown("#### **Predicted 2026 LIPS Priority Schedule**")
+        
+        # Prepare display columns
+        disp_df = prediction[[
+            'lips_rank_2026', 'plant', 'lips_2026', 'rank_change', 
+            'predicted_nrw_2026', 'predicted_bursts_2026', 'pipe_age_2026'
+        ]].sort_values('lips_rank_2026')
+        
+        disp_df.columns = [
+            '2026 Rank', 'Plant Name', 'Projected LIPS Score', 'Rank Shift', 
+            'Est. 2026 NRW (%)', 'Est. Bursts / 100km', 'Pipe Age (2026)'
+        ]
+        
+        # Format Rank Shift output
+        def style_shift(val):
+            if val > 0:
+                return f"▲ +{val}"
+            elif val < 0:
+                return f"▼ {val}"
+            return "➖"
+            
+        disp_df['Rank Shift'] = disp_df['Rank Shift'].apply(style_shift)
+
+        st.dataframe(
+            disp_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Projected LIPS Score": st.column_config.ProgressColumn(
+                    "Projected LIPS Score",
+                    help="Predicted LIPS urgency score out of 100",
+                    format="%.1f",
+                    min_value=0,
+                    max_value=100,
+                ),
+                "Est. 2026 NRW (%)": st.column_config.NumberColumn(format="%.1f%%"),
+                "Est. Bursts / 100km": st.column_config.NumberColumn(format="%.1f"),
+            }
+        )
+
+        # Plotly Comparison: Current vs 2026 Rank Shift
+        st.markdown("#### **2026 Priority Escalation Matrix**")
+        fig_shift = px.scatter(
+            prediction,
+            x="lips",
+            y="lips_2026",
+            size="predicted_bursts_2026",
+            color="rank_change",
+            hover_name="plant",
+            text="plant",
+            color_continuous_scale="RdYlGn_r",
+            labels={
+                "lips": "Current LIPS Score",
+                "lips_2026": "Projected 2026 LIPS Score",
+                "rank_change": "Rank Escalation"
+            },
+            title="<b>Current vs. 2026 Projected LIPS Score Shift</b>"
+        )
+        fig_shift.add_shape(
+            type="line", line=dict(dash="dash", color="gray"),
+            x0=0, x1=100, y0=0, y1=100
+        )
+        fig_shift.update_traces(textposition="top center")
+        st.plotly_chart(fig_shift, use_container_width=True)
 
 # ==========================================================================
 # Plant Profile tab
