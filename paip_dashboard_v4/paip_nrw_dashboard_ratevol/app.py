@@ -287,7 +287,7 @@ NAV = [
                        ("History", "phist"),
                       ("Comparison", "pcomp")]),
 ]
-SEC_PRIORITY = {"rank", "sched", "curve", "pred}
+SEC_PRIORITY = {"rank", "sched", "curve", "pred"}
 SEC_LOSS = {"ratevol", "comp"}
 SEC_PLANT = {"psum", "pmodel", "phist", "pcomp"}
 
