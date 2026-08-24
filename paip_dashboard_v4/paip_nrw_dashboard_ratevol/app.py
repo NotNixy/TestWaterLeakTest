@@ -313,6 +313,8 @@ with st.sidebar:
         st.markdown('<div class="pop-h">Tick to narrow. Nothing ticked means '
                     'everything.</div>', unsafe_allow_html=True)
 
+        filters = st.radio("Filter by:", ["Plant name", "Districts"], horizontal=True, key="filter")
+      
         def _clear():
             for pre, opts in (("f_p_", _p_all), ("f_d_", _d_all)):
                 for o in opts:
@@ -320,8 +322,14 @@ with st.sidebar:
 
         st.button("Clear all", key="f_clear", type="tertiary", on_click=_clear)
 
-        for _title, _pre, _opts, _cols in (("Plant Name", "f_p_", _p_all, 4),
-                                           ("District", "f_d_", _d_all, 4)):
+        if filters == "Plant name":
+            target = [("Plant Name", "f_p_", _p_all, 4)]
+        elif filters == "Districts":
+            target = [("District", "f_d_", _d_all, 4)]
+        else:
+            target = []
+
+        for _title, _pre, _opts, _cols in target:
             st.markdown(f'<div class="pop-s">{_title}</div>',
                         unsafe_allow_html=True)
             _cc = st.columns(_cols)
