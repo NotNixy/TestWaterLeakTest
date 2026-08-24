@@ -1,0 +1,2 @@
+train_years,holdout_year,n_plants,top_n,top_n_precision_pct,rank_spearman,score_mae
+2023-2024,2025,74,10,80.0,0.871,6.72
