@@ -219,13 +219,134 @@ def lips(g: pd.DataFrame, weights: dict = None) -> pd.DataFrame:
     out["rank_gap"] = out["rate_rank"] - out["volume_rank"]
     return out
 
+# --------------------------------------------------------------------------
+# 6. LIPS Prediction Model (for year 2026)
+# --------------------------------------------------------------------------
+def predict_2026_lips(scored_history: pd.DataFrame, weights: dict = None,
+                       target_year: int = 2026) -> pd.DataFrame:
+    """
+    Projects each plant's 2026 LIPS score using the SAME 4-factor formula and
+    weights as the historical score (see `lips()` / DEFAULT_WEIGHTS, mirrored
+    in app.py's score_lips), so the projection stays on the same scale as the
+    LIPS numbers analysts already trust instead of a separate ad-hoc formula.
+
+    `scored_history` must contain one row per plant per year (i.e. the full
+    output of `lips()` across all years, not just the latest year), because
+    each component is extrapolated from that plant's OWN 2023-2025 trend:
+        - nrw_per_km_m3, bursts_per_100km, account_density: per-plant linear
+          regression against year, extrapolated to target_year.
+        - plant_age_yr: advanced deterministically by the elapsed years.
+    A plant with only one year of history (regression not possible) is held
+    flat at its latest observed value.
+    """
+    weights = weights or DEFAULT_WEIGHTS
+    total = sum(weights.values())
+
+    hist = scored_history.copy()
+    last_year = int(hist["year"].max())
+    years_ahead = target_year - last_year
+    latest = hist[hist.year == last_year].set_index("plant")
+
+    def trend_project(col: str) -> pd.Series:
+        """Per-plant linear trend in `col` across all historical years,
+        extrapolated `years_ahead` beyond the latest observed value."""
+        slopes = {}
+        for plant, g in hist.groupby("plant"):
+            sub = g[["year", col]].dropna()
+            slopes[plant] = np.polyfit(sub.year, sub[col], 1)[0] if len(sub) >= 2 else 0.0
+        slope = pd.Series(slopes).reindex(latest.index).fillna(0.0)
+        return latest[col] + slope * years_ahead
+
+    proj = pd.DataFrame(index=latest.index)
+    proj["nrw_per_km_m3"] = trend_project("nrw_per_km_m3").clip(lower=0)
+    proj["bursts_per_100km"] = trend_project("bursts_per_100km").clip(lower=0)
+    proj["account_density"] = trend_project("account_density").clip(lower=0)
+    proj["plant_age_yr"] = latest["plant_age_yr"] + years_ahead
+
+    # Carried through for the schedule table / scatter plot, not part of the
+    # score itself (nrw_per_km_m3 is the scored loss-density component).
+    proj["predicted_nrw_2026"] = trend_project("nrw_pct").clip(lower=0, upper=100)
+    proj["predicted_bursts_2026"] = proj["bursts_per_100km"]
+    proj["pipe_age_2026"] = proj["plant_age_yr"]
+
+    proj["district"] = latest["district"]
+    proj["region"] = latest["region"]
+    proj["area_type"] = latest["area_type"]
+    proj["lips"] = latest["lips"]
+    proj["lips_rank"] = latest["lips_rank"]
+
+    score = pd.Series(0.0, index=proj.index)
+    for col, w in weights.items():
+        pr = percentile_rank(proj[col])
+        proj[f"pr_{col}_2026"] = pr
+        score += pr * (w / total)
+    proj["lips_2026"] = score.round(1)
+
+    # Same tie-breaking convention as lips(): score -> loss density -> age.
+    proj = proj.sort_values(["lips_2026", "nrw_per_km_m3", "plant_age_yr"], ascending=False)
+    proj["lips_rank_2026"] = np.arange(1, len(proj) + 1)
+    proj["rank_change"] = proj["lips_rank"] - proj["lips_rank_2026"]  # +ve = escalating
+
+    return proj.reset_index().rename(columns={"index": "plant"})
+
+
+# --------------------------------------------------------------------------
+# 7. Backtest the trend projection (real forecast-accuracy figure)
+# --------------------------------------------------------------------------
+def backtest_lips_forecast(scored_history: pd.DataFrame, weights: dict = None,
+                            top_n: int = 10) -> pd.DataFrame:
+    """
+    Measures how good the trend projection in `predict_2026_lips` actually
+    is, instead of asserting an accuracy figure. Trains on every year except
+    the most recent, "predicts" that held-out year, and compares the
+    prediction against what actually happened:
+        - top_n_precision_pct : of the actual top-N priority plants in the
+          held-out year, what % did the prediction also flag in its top N.
+          This is the headline number — it answers the question a CAPEX
+          planner actually cares about ("would I have dispatched crews to
+          the right plants a year early?").
+        - rank_spearman       : Spearman correlation between predicted and
+          actual priority order across all plants.
+        - score_mae           : mean absolute error between the predicted
+          and actual LIPS score (0-100 scale).
+    Requires at least 2 years of history (1 to train the trend, 1 to check
+    it against); returns an empty frame if there isn't enough history yet.
+    """
+    weights = weights or DEFAULT_WEIGHTS
+    years = sorted(scored_history.year.unique())
+    if len(years) < 2:
+        return pd.DataFrame()
+
+    holdout_year = years[-1]
+    train = scored_history[scored_history.year < holdout_year]
+
+    pred = predict_2026_lips(train, weights=weights, target_year=holdout_year)
+    actual = (scored_history[scored_history.year == holdout_year]
+              [["plant", "lips", "lips_rank"]]
+              .rename(columns={"lips": "lips_actual", "lips_rank": "lips_rank_actual"}))
+
+    cmp = pred.merge(actual, on="plant")
+    n = min(top_n, len(cmp))
+
+    pred_top = set(cmp.nsmallest(n, "lips_rank_2026").plant)
+    actual_top = set(cmp.nsmallest(n, "lips_rank_actual").plant)
+    top_n_precision_pct = len(pred_top & actual_top) / n * 100
+
+    return pd.DataFrame([{
+        "train_years": f"{train.year.min()}-{train.year.max()}",
+        "holdout_year": holdout_year,
+        "n_plants": len(cmp),
+        "top_n": n,
+        "top_n_precision_pct": round(top_n_precision_pct, 1),
+        "rank_spearman": round(cmp["lips_rank_2026"].corr(cmp["lips_rank_actual"], method="spearman"), 3),
+        "score_mae": round((cmp["lips_2026"] - cmp["lips_actual"]).abs().mean(), 2),
+    }])
+
 
 # --------------------------------------------------------------------------
 
 def build(source=None, strict: bool = True):
-    """Full clean-and-aggregate pass. Returns (plant_month, plant_year, report)."""
-    # Previously-known plants let the loader report additions and disappearances
-    # across refreshes instead of silently absorbing a renamed plant.
+    """Full clean-and-aggregate pass. Returns (plant_month, plant_year, report, coverage, lips_2026)."""
     known = None
     prev = OUT / "plant_crosswalk.csv"
     if prev.exists():
@@ -243,7 +364,13 @@ def build(source=None, strict: bool = True):
     # against contemporaries, and a new year must not reshuffle history.
     scored = pd.concat([lips(sub) for _, sub in py.groupby("year")],
                        ignore_index=True)
-
+    
+    # 1. GENERATE THE PREDICTION DATAFRAME HERE
+    # Pass the full multi-year `scored` history (not just the latest year) so
+    # predict_2026_lips can fit each plant's own 2023-2025 trend per component.
+    lips_2026_df = predict_2026_lips(scored)
+    backtest = backtest_lips_forecast(scored)
+    
     crosswalk = (df[["plant", "district", "region", "area_type"]]
                  .drop_duplicates()
                  .sort_values(["region", "district", "plant"])
@@ -253,19 +380,23 @@ def build(source=None, strict: bool = True):
 
     coverage = year_completeness(df)
 
+    # 2. EXPORT TO CSV NOW THAT IT IS DEFINED
     df.to_csv(OUT / "nrw_plant_month.csv", index=False)
     scored.to_csv(OUT / "nrw_plant_year.csv", index=False)
+    lips_2026_df.to_csv(OUT / "lips_2026_prediction.csv", index=False)
+    backtest.to_csv(OUT / "forecast_backtest.csv", index=False)
     crosswalk.to_csv(OUT / "plant_crosswalk.csv", index=False)
     checks.to_csv(OUT / "data_quality.csv", index=False)
     missing.to_csv(OUT / "missing_values.csv", index=False)
     coverage.to_csv(OUT / "year_coverage.csv", index=False)
-    return df, scored, report, coverage
+    
+    return df, scored, report, coverage, lips_2026_df, backtest
 
 
 def main():
     source = sys.argv[1] if len(sys.argv) > 1 else None
     try:
-        df, scored, report, coverage = build(source)
+        df, scored, report, coverage, lips_2026_df, backtest = build(source)
     except DataError as exc:
         print(exc)
         raise SystemExit(1)
@@ -273,10 +404,14 @@ def main():
     print(report.text())
     print("\nYear coverage:")
     print(coverage.to_string(index=False))
-    print(f"\nplant-month records : {len(df):,}")
-    print(f"plant-year rows     : {len(scored):,}")
+    print(f"\nplant-month records    : {len(df):,}")
+    print(f"plant-year rows        : {len(scored):,}")
+    print(f"2026 predicted rows    : {len(lips_2026_df):,}")
     print("\nIdentity checks (max absolute deviation):")
     print(pd.read_csv(OUT / "data_quality.csv").to_string(index=False))
+    if not backtest.empty:
+        print("\nForecast backtest (trained on all but the latest year):")
+        print(backtest.to_string(index=False))
 
 
 if __name__ == "__main__":
