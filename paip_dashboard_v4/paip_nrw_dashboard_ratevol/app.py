@@ -89,7 +89,6 @@ def load():
 
     return m, y, x, q, v, df_priority, df_backtest
 
-
 @st.cache_data
 def load_ml():
     try:
@@ -277,15 +276,15 @@ with top_col2:
 # ==========================================================================
 
 NAV = [
-    ("OVERVIEW", [("At a glance", "cmd")]),
-    ("PRIORITY", [("Ranking", "rank"),
-                  ("Full schedule", "sched"),
-                  ("Recovery curve", "curve"),
-                  ("Prediction", "pred")]),
-    ("PLANT PROFILE", [("Summary", "psum"),
-                       ("Diagnosis", "pmodel"),
-                       ("History", "phist"),
-                      ("Comparison", "pcomp")]),
+    ("OVERVIEW", [(":material/dashboard: At a glance", "cmd")]),
+    ("PRIORITY", [(":material/leaderboard: Ranking", "rank"),
+                  (":material/table_eye: Full schedule", "sched"),
+                  (":material/stacked_line_chart: Recovery curve", "curve"),
+                  (":material/online_prediction: Prediction", "pred")]),
+    ("PLANT PROFILE", [(":material/article: Summary", "psum"),
+                       (":material/diagnosis: Diagnosis", "pmodel"),
+                       (":material/history: History", "phist"),
+                      (":material/compare: Comparison", "pcomp")]),
 ]
 SEC_PRIORITY = {"rank", "sched", "curve", "pred"}
 SEC_LOSS = {"ratevol", "comp"}
@@ -478,6 +477,7 @@ if VIEW == "cmd":
     /* Card headers */
     .card-t { margin-bottom: 0 !important; font-size: 0.95rem !important; line-height: 1.1 !important; }
     .card-s { margin-bottom: 0.2rem !important; font-size: 0.68rem !important; opacity: 0.8; }
+    .card-s.card-s-lg { font-size: 0.82rem !important; }
     
     /* Explanation Box & Text styling */
     .ov-line {
@@ -503,33 +503,31 @@ if VIEW == "cmd":
     _top10 = sel.nsmallest(min(10, n_plants), "lips_rank")
     _share10 = _top10.nrw_m3.sum() / tot_nrw * 100 if tot_nrw else 0.0
 
-    # Row 1: Graphs 1 & 2
-    r1 = st.columns(2)
+    # Row 1: Graphs 1, 2 and 3
+    r1 = st.columns(3)
 
     with r1[0]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">1. Priority Queue</div>'
-                        f'<div class="card-s">Top {_n8} plants by LIPS</div>',
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown(f'<div class="card-t">Top Priority Queue</div>'
+                        f'<div class="card-s card-s-lg">Highest rank needs repair first</div>',
                         unsafe_allow_html=True)
             d_ = sel.nsmallest(_n8, "lips_rank").sort_values("lips")
             f = go.Figure(go.Bar(
                 x=d_.lips, y=d_.plant, orientation="h",
-                marker=dict(color=T.BLUE, line=dict(width=0)),
+                marker=dict(color=d_.lips, colorscale=T.SEQ,
+                            line=dict(color=T.SURFACE, width=2), showscale=False),
                 text=[f"{v:.0f}" for v in d_.lips], textposition="outside",
                 textfont=dict(size=10.5, color=T.INK_2), customdata=d_.district,
                 hovertemplate=("<b>%{y}</b> · %{customdata}<br>"
                                "LIPS %{x:.1f}<extra></extra>")))
             f.update_xaxes(range=[0, 116], showgrid=True)
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=152))
-            st.markdown(
-                '<div class="ov-line">Shows which plants need repair first.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284))
 
     with r1[1]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">2. Rate vs Volume</div>'
-                        '<div class="card-s">Comparing percentage loss against total volume</div>',
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown('<div class="card-t">Rate vs Volume</div>'
+                        '<div class="card-s card-s-lg">Comparing percentage loss against total volume</div>',
                         unsafe_allow_html=True)
             tr_ = sel.nsmallest(10, "rate_rank")
             tv_ = sel.nsmallest(10, "volume_rank")
@@ -553,18 +551,12 @@ if VIEW == "cmd":
                                    "<br>%{y:.1f}% loss<extra></extra>")))
             f.update_xaxes(type="log", dtick=1)
             f.update_yaxes(ticksuffix="%")
-            chart(mini(f, h=142, legend=True))
-            st.markdown(
-                '<div class="ov-line">Compares small % losses vs big volume losses.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284, legend=True))
 
-    # Row 2: Graphs 3 & 4
-    r2 = st.columns(2)
-
-    with r2[0]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">3. What Drives Each Score</div>'
-                        '<div class="card-s">LIPS component percentiles, weighted</div>',
+    with r1[2]:
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown('<div class="card-t">LIPS Component Percentiles</div>'
+                        '<div class="card-s card-s-lg">Shows what factors drive each plant\'s score</div>',
                         unsafe_allow_html=True)
             d_ = sel.nsmallest(_n6, "lips_rank").sort_values("lips")
             f = go.Figure()
@@ -580,15 +572,14 @@ if VIEW == "cmd":
                                        "percentile %{x:.0f}<extra></extra>")))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=142, legend=True))
-            st.markdown(
-                '<div class="ov-line">Shows what factors drive each plant\'s score.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284, legend=True))
 
-    with r2[1]:
-        with st.container(border=True):
-            st.markdown(f'<div class="card-t">4. Monthly Loss Rate</div>'
-                        f'<div class="card-s">{year}, system-wide</div>',
+    # Row 2 : Graphs 4, 5 and 6
+    r2 = st.columns(3)
+    with r2[0]:
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown(f'<div class="card-t">Monthly Loss Rate ({year})</div>'
+                        f'<div class="card-s card-s-lg">Tracks Pahang\'s water loss rate in {year}</div>',
                         unsafe_allow_html=True)
             mo = (msel.groupby("month", as_index=False)
                       .agg(p=("production_m3", "sum"), nn=("nrw_m3", "sum")))
@@ -601,18 +592,12 @@ if VIEW == "cmd":
             f.update_yaxes(ticksuffix="%",
                            range=[mo.pct.min() - 1.0, mo.pct.max() + 1.0])
             f.update_xaxes(dtick=2, showgrid=False)
-            chart(mini(f, h=152))
-            st.markdown(
-                '<div class="ov-line">Tracks how water loss changed this year.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284))
 
-    # Row 3: Graphs 5 & 6
-    r3 = st.columns(2)
-
-    with r3[0]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">5. Loss Concentration</div>'
-                        '<div class="card-s">Cumulative share of NRW, plants ranked by volume</div>',
+    with r2[1]:
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown('<div class="card-t">Loss Concentration</div>'
+                        f'<div class="card-s card-s-lg">Prioritizing top plants can save tons of water </div>',
                         unsafe_allow_html=True)
             sv = sel.sort_values("nrw_m3", ascending=False).reset_index(drop=True)
             sv["cum"] = sv.nrw_m3.cumsum() / sel.nrw_m3.sum() * 100
@@ -629,15 +614,12 @@ if VIEW == "cmd":
                              font=dict(size=11, color=T.INK))
             f.update_yaxes(range=[0, 104], ticksuffix="%")
             f.update_xaxes(showgrid=False)
-            chart(mini(f, h=152))
-            st.markdown(
-                '<div class="ov-line">Shows how few plants cause most of the loss.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284))
 
-    with r3[1]:
-        with st.container(border=True):
-            st.markdown('<div class="card-t">6. Loss Composition</div>'
-                        '<div class="card-s">Largest plants &middot; physical vs commercial split</div>',
+    with r2[2]:
+        with st.container(border=True, vertical_alignment="center"):
+            st.markdown('<div class="card-t">Top NRW losses</div>'
+                        '<div class="card-s card-s-lg">Split into physical and commercial</div>',
                         unsafe_allow_html=True)
             d_ = sel.nlargest(_n6, "nrw_m3").sort_values("nrw_m3")
             f = go.Figure()
@@ -654,10 +636,7 @@ if VIEW == "cmd":
                 hovertemplate="<b>%{y}</b><br>%{x:,.0f} m³<extra></extra>"))
             f.update_layout(barmode="stack")
             f.update_yaxes(showgrid=False)
-            chart(mini(f, h=142, legend=True))
-            st.markdown(
-                '<div class="ov-line">Splits losses into pipe leaks vs billing issues.</div>',
-                unsafe_allow_html=True)
+            chart(mini(f, h=284, legend=True))
 
 
 # ====================================================================
@@ -666,11 +645,9 @@ if VIEW == "cmd":
 
 if VIEW in SEC_PRIORITY:
     if VIEW == "rank":
-        st.markdown("### Leakage Intervention Priority Score (4-Factor LIPS)")
-        st.markdown(T.callout(
-            "LIPS blends loss density, burst rate, plant age, and account "
-            "density into one 0–100 priority score."
-        ), unsafe_allow_html=True)
+        st.markdown(" ### :material/leaderboard: Leakage Intervention Priority Score (4-Factor LIPS)")
+        st.markdown("#### :material/info: LIPS blends loss density, burst rate, plant age, and account density into one 0–100 priority score.", unsafe_allow_html=True)
+        st.space()
 
         c1, c2 = st.columns([1, 1])
         n_show = min(15, n_plants)
@@ -720,7 +697,7 @@ if VIEW in SEC_PRIORITY:
             chart(fig)
 
     if VIEW == "curve":
-        st.markdown("### Recovery curve — how far a crew programme gets")
+        st.markdown("### :material/stacked_line_chart: Recovery curve — how far a crew programme gets")
 
         order_lips = sel.sort_values("lips_rank")
         order_rate = sel.sort_values("rate_rank")
@@ -739,12 +716,12 @@ if VIEW in SEC_PRIORITY:
         rate_at_k = rate_curve[k - 1]
         gap_at_k = lips_at_k - rate_at_k
 
-        st.markdown(T.callout(
-            f" In the first <b>{k} plant{'s' if k != 1 else ''}</b> "
+        st.markdown(
+            f"#### :material/info: In the first <b>{k} plant{'s' if k != 1 else ''}</b> "
             f"(~{k / n_plants * 100:.0f}% of the programme), LIPS/volume order "
             f"recovers <b>{lips_at_k:.1f}%</b> of total NRW versus "
             f"<b>{rate_at_k:.1f}%</b> for rate order — a "
-            f"<b>{gap_at_k:.1f} pp</b> gap for the same crew effort."),
+            f"<b>{gap_at_k:.1f} pp</b> gap for the same crew effort.",
             unsafe_allow_html=True)
 
         fig = go.Figure()
@@ -763,7 +740,8 @@ if VIEW in SEC_PRIORITY:
         chart(fig)
 
     if VIEW == "sched":
-        st.markdown("### Full intervention schedule")
+        st.markdown("### :material/table_eye: Full intervention schedule")
+        st.space()
         sched = sel.sort_values("lips_rank")[
             ["lips_rank", "plant", "district", "area_type", "lips",
              "nrw_per_km_m3", "bursts_per_100km", "plant_age_yr", "account_density",
@@ -787,18 +765,18 @@ if VIEW in SEC_PRIORITY:
                            f"paip_lips_schedule_{year}.csv", "text/csv")
 
     if VIEW == "pred":
-        st.markdown("### **LIPS 2026 Prediction**")
-        st.markdown("#### Projections account for compound pipe aging, burst rate escalation, and multi-year NRW trajectory trends.")
+        st.markdown("### :material/online_prediction: **LIPS 2026 Prediction**")
+        st.markdown("#### :material/info: Projections account for compound pipe aging, burst rate escalation, and multi-year NRW trajectory trends.")
         
         # Priority Summary Metrics
         escalated = len(prediction[prediction['rank_change'] > 1])
         deescalated = len(prediction[prediction['rank_change'] < 1])
         top_risk = prediction.sort_values('lips_rank_2026').iloc[0]['plant']
-        lips_pred = prediction.sort_values('lips_rank_2026').iloc[0]['lips']
+        lips_pred = prediction.sort_values('lips_rank_2026').iloc[0]['lips_2026']
         
         m = st.columns(4)
 
-        m[0].markdown(T.tile("2026 #1 Priority Plant", top_risk, f"with projected LIPS score {lips_pred}"), unsafe_allow_html=True)
+        m[0].markdown(T.tile("2026 #1 Priority Plant", top_risk, "with", f"projected LIPS score {lips_pred}"), unsafe_allow_html=True)
 
         m[1].markdown(T.tile("Escalating Plants", f"{escalated} Plants"), unsafe_allow_html=True)
 
@@ -811,8 +789,6 @@ if VIEW in SEC_PRIORITY:
                           unsafe_allow_html=True)
         else:
             m[3].markdown(T.tile("Forecast Accuracy Score", "N/A", "Needs 2+ years of history to backtest"), unsafe_allow_html=True)
-
-        # k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
 
 
         # 2026 Priority Table Display
@@ -886,14 +862,13 @@ if VIEW in SEC_PRIORITY:
 # ==========================================================================
 
 if VIEW in SEC_PLANT:
-    st.markdown("### Plant profile")
     plant_list = sel.sort_values("lips_rank").plant.tolist()
     if VIEW == "pcomp":
         # 1. Define top row columns matching both selectboxes and captions
         c0a, c0b = st.columns(2)
     
         with c0a:
-            plant = st.selectbox("Plant", plant_list, index=0)
+            plant = st.selectbox(":material/water_drop: Plant", plant_list, index=0)
             p = sel[sel.plant == plant].iloc[0]
             pm = msel[msel.plant == plant].sort_values("date")
             hist = monthly[monthly.plant == plant].sort_values("date")
@@ -913,7 +888,7 @@ if VIEW in SEC_PLANT:
             saved_p2 = st.session_state.get("p2_name")
             p2_idx = other_plants.index(saved_p2) if saved_p2 in other_plants else 0
 
-            p2_name = st.selectbox("Compare with", other_plants, index=p2_idx, key="p2_name")
+            p2_name = st.selectbox(":material/compare_arrows: Compare with", other_plants, index=p2_idx, key="p2_name")
         
             p2 = sel[sel.plant == p2_name].iloc[0]
             hist2 = monthly[monthly.plant == p2_name].sort_values("date")
@@ -933,7 +908,7 @@ if VIEW in SEC_PLANT:
         # Standard single-plant layout for psum, pmodel, phist
         c0a, c0b = st.columns([1, 2])
         with c0a:
-            plant = st.selectbox("Plant", plant_list, index=0)
+            plant = st.selectbox(":material/water_drop: Plant", plant_list, index=0)
             p = sel[sel.plant == plant].iloc[0]
             pm = msel[msel.plant == plant].sort_values("date")
             hist = monthly[monthly.plant == plant].sort_values("date")
@@ -956,6 +931,9 @@ if VIEW in SEC_PLANT:
     burst_ratio = p.bursts_per_100km / burst_med if burst_med else 1.0
 
     if VIEW == "psum":
+        st.markdown(f"### :material/article: Summary for {plant}")
+        st.space()
+
         k = st.columns(4)
         k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
 
@@ -1060,7 +1038,7 @@ if VIEW in SEC_PLANT:
             st.info(f"No model output for {plant} in {year}. The expected-loss "
                     f"model is fitted for {ML_YEAR}.")
         else:
-            st.markdown("### Root-Cause Diagnosis")
+            st.markdown("### :material/diagnosis: Root-Cause Diagnosis")
             pm_ml = ml_monthly[ml_monthly.plant == plant].sort_values("date")
             
             # --- 1. Operational KPI Strip (Driven by LIPS + ML Diagnostics) ---
@@ -1164,6 +1142,7 @@ if VIEW in SEC_PLANT:
                 )
 
     if VIEW == "phist":
+        st.markdown("### :material/history: <b>History</b>", unsafe_allow_html=True)
         c3, c4 = st.columns(2)
         with c3:
             fig = go.Figure()
@@ -1172,11 +1151,7 @@ if VIEW in SEC_PLANT:
                 line=dict(color=T.BLUE, width=2),
                 marker=dict(size=5, color=T.BLUE),
                 hovertemplate="%{x|%b %Y}<br>Loss rate  %{y:.1f}%<extra></extra>"))
-            fig.add_hline(y=T.POLICY_TARGET_PCT,
-                          line=dict(color=T.GOOD, width=1.2, dash="dash"),
-                          annotation_text="25% target",
-                          annotation_font=dict(size=10.5, color=T.SUCCESS_TEXT))
-            fig.update_layout(title="Loss rate history", height=560,
+            fig.update_layout(title="Loss rate history", height=500,
                               showlegend=False, xaxis=dict(title=None),
                               yaxis=dict(title="NRW (%)", ticksuffix="%"))
             chart(fig)
@@ -1187,7 +1162,7 @@ if VIEW in SEC_PLANT:
                 x=hist.date, y=hist.pipe_bursts, name="Bursts",
                 marker=dict(color=T.ORANGE, line=dict(color=T.SURFACE, width=1)),
                 hovertemplate="%{x|%b %Y}<br>%{y:.0f} bursts<extra></extra>"))
-            fig.update_layout(title="Recorded pipe bursts", height=560,
+            fig.update_layout(title="Recorded pipe bursts", height=500,
                               showlegend=False, bargap=0.15,
                               xaxis=dict(title=None),
                               yaxis=dict(title="Bursts in month"))
@@ -1195,8 +1170,7 @@ if VIEW in SEC_PLANT:
 
         with st.expander(f"Monthly records for {plant}"):
             cols = ["date", "production_m3", "billed_m3", "nrw_m3", "nrw_pct",
-                    "physical_loss_m3", "commercial_loss_m3", "pipe_bursts",
-                    "complaints", "pressure_bar", "rainfall_mm", "nrw_value_rm"]
+                    "physical_loss_m3", "commercial_loss_m3", "pipe_bursts", "pressure_bar"]
             st.dataframe(hist[cols], width='stretch', hide_index=True,
                          column_config={
                              "date": st.column_config.DateColumn("Month", format="MMM YYYY"),
@@ -1204,27 +1178,24 @@ if VIEW in SEC_PLANT:
                              "billed_m3": st.column_config.NumberColumn("Billed m³", format="%,d"),
                              "nrw_m3": st.column_config.NumberColumn("NRW m³", format="%,d"),
                              "nrw_pct": st.column_config.NumberColumn("Rate", format="%.1f%%"),
-                             "physical_loss_m3": st.column_config.NumberColumn("Physical m³", format="%,d"),
-                             "commercial_loss_m3": st.column_config.NumberColumn("Commercial m³", format="%,d"),
+                             "physical_loss_m3": st.column_config.NumberColumn("Physical NRW m³", format="%,d"),
+                             "commercial_loss_m3": st.column_config.NumberColumn("Commercial NRW m³", format="%,d"),
                              "pipe_bursts": st.column_config.NumberColumn("Bursts"),
-                             "complaints": st.column_config.NumberColumn("Complaints"),
-                             "pressure_bar": st.column_config.NumberColumn("Pressure bar", format="%.2f"),
-                             "rainfall_mm": st.column_config.NumberColumn("Rain mm", format="%,d"),
-                             "nrw_value_rm": st.column_config.NumberColumn("Value RM", format="%,d")})
+                             "pressure_bar": st.column_config.NumberColumn("Pressure bar", format="%.2f")})
     if VIEW == "pcomp":
-        st.markdown("#### <b>Side-by-Side Plant Comparison</b>", unsafe_allow_html=True)
+        st.markdown("### :material/compare: <b>Side-by-Side Plant Comparison</b>", unsafe_allow_html=True)
         
         # --- Key Metrics Comparison Table/Tiles ---
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown(f"##### **{plant}** (Selected)")
+            st.markdown(f"#### **{plant}** (Selected)")
             st.markdown(T.tile("LIPS Score", f"{p.lips:.1f}", f"Rank {p.lips_rank}"), unsafe_allow_html=True)
             st.markdown(T.tile("Water Loss Rate", f"{p.nrw_pct:.1f}%", f"Rank {p.rate_rank}"), unsafe_allow_html=True)
             st.markdown(T.tile("Water Lost", f"{m3(p.nrw_m3)} m³", f"Rank {p.volume_rank}"), unsafe_allow_html=True)
             st.markdown(T.tile("Burst Rate", f"{p.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
 
         with c2:
-            st.markdown(f"##### **{p2_name}** (Comparison)")
+            st.markdown(f"#### **{p2_name}** (Comparison)")
             st.markdown(T.tile("LIPS Score", f"{p2.lips:.1f}", f"Rank {p2.lips_rank}"), unsafe_allow_html=True)
             st.markdown(T.tile("Water Loss Rate", f"{p2.nrw_pct:.1f}%", f"Rank {p2.rate_rank}"), unsafe_allow_html=True)
             st.markdown(T.tile("Water Lost", f"{m3(p2.nrw_m3)} m³", f"Rank {p2.volume_rank}"), unsafe_allow_html=True)
@@ -1235,7 +1206,8 @@ if VIEW in SEC_PLANT:
         st.markdown('<div class="waverule" style="margin-bottom: 1rem;"></div>', unsafe_allow_html=True)
 
         # --- Comparative Charts ---
-        st.markdown("#### <b>Comparative Charts</b>", unsafe_allow_html=True)
+        st.markdown("### :material/monitoring: <b>Comparative Charts</b>", unsafe_allow_html=True)
+        st.space()
         chart_col1, chart_col2 = st.columns(2)
 
         # Chart 1: Historical NRW Rate Comparison
