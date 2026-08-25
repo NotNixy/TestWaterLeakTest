@@ -370,7 +370,7 @@ with st.sidebar:
     st.radio("Appearance", ["Light", "Dark", "Auto"], horizontal=True,
              key="appearance",
              help=f"Auto follows your system setting (detected: {_detected}).")
-    st.caption(f"Source: PAIP monthly records, {YEAR_SPAN}.")
+    st.caption(f"Source: Pengurusan Air Pahang Berhad (PAIP).")
 
 if is_partial(year):
     st.markdown(
