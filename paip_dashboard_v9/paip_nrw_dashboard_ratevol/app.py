@@ -810,19 +810,26 @@ if VIEW in SEC_PRIORITY:
                 forecast_backtest.method == "projection"].iloc[0]
             _base = forecast_backtest[
                 forecast_backtest.method.str.startswith("persistence")].iloc[0]
-            # Rank error, not top-N precision. Both methods score the same
-            # 80% on precision, so quoting it alone says nothing about
-            # whether the model is worth having; the error against the
-            # do-nothing baseline is the number that separates them.
+            # Rank agreement (Spearman) rather than top-N precision.
+            # Both are percentages and both read "higher is better", but
+            # projection and persistence score an identical 80.0% on top-10
+            # precision - a 0.0pp gap - so that number cannot show whether
+            # the model beats doing nothing. Rank agreement separates them
+            # (92.3% vs 90.4%) and uses the whole ranking, not just the top
+            # ten. The baseline stays in the subtitle so the gap is visible
+            # rather than implied.
             m[3].markdown(T.tile(
-                "Rank error vs doing nothing",
-                f"{_proj.rank_mae_places:.2f}",
-                "places",
-                f"against {_base.rank_mae_places:.2f} for persistence · "
+                "Forecast accuracy",
+                f"{_proj.rank_spearman * 100:.1f}%",
+                "",
+                f"rank agreement with actual · "
+                f"{_base.rank_spearman * 100:.1f}% if you assume no change · "
                 f"backtest {_proj.train_years} → {int(_proj.holdout_year)}"),
                 unsafe_allow_html=True)
         else:
-            m[3].markdown(T.tile("Forecast Accuracy Score", "N/A", "Needs 2+ years of history to backtest"), unsafe_allow_html=True)
+            m[3].markdown(T.tile("Forecast accuracy", "N/A", "",
+                                 "Needs 2+ years of history to backtest"),
+                          unsafe_allow_html=True)
 
 
         # 2026 Priority Table Display
