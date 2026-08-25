@@ -665,11 +665,13 @@ if VIEW in SEC_PRIORITY:
                             line=dict(color=T.SURFACE, width=2), showscale=False),
                 text=[f"{v:.1f}" for v in top.lips],
                 textposition="outside", textfont=dict(size=11, color=T.INK_2),
-                customdata=np.stack([top.district, top.nrw_per_km_m3, top.bursts_per_100km, top.lips_rank], -1),
-                hovertemplate=("<b>%{y}</b> · %{customdata[0]}<br>"
-                               "LIPS Score: %{x:.1f} (Priority %{customdata[3]})<br>"
+                customdata=np.stack([top.district, top.nrw_per_km_m3, top.bursts_per_100km, top.lips_rank, top.plant_age_yr, top.account_density], -1),
+                hovertemplate=("<b>%{y}</b> · %{customdata[0]} · ✪ %{customdata[3]}<br>"
+                               "LIPS Score: %{x:.1f}<br>"
                                "Loss Density: %{customdata[1]:,.0f} m³/km<br>"
-                               "Burst Rate: %{customdata[2]:.1f} /100km<extra></extra>")))
+                               "Burst Rate: %{customdata[2]:.1f} /100km<br>"
+                               "Plant Age: %{customdata[4]:.0f} years old<br>"
+                               "Account density: %{customdata[5]:.1f} acc/km<extra></extra>")))
             fig.update_layout(
                 title=f"<b>Top {n_show} Plants by LIPS Priority</b>", height=572,
                 bargap=0.3,
