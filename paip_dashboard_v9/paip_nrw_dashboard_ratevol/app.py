@@ -799,11 +799,11 @@ if VIEW in SEC_PRIORITY:
         
         m = st.columns(4)
 
-        m[0].markdown(T.tile("2026 #1 Priority Plant", top_risk, "with", f"projected LIPS score {lips_pred}"), unsafe_allow_html=True)
+        m[0].markdown(T.tile('<span style="font-weight:800 !important">2026 #1 Priority Plant</span>', top_risk, "with", f"projected LIPS score {lips_pred}"), unsafe_allow_html=True)
 
-        m[1].markdown(T.tile("Escalating Plants", f"{escalated} Plants"), unsafe_allow_html=True)
+        m[1].markdown(T.tile('<span style="font-weight:800 !important">Escalating Plants</span>', f"{escalated} Plants"), unsafe_allow_html=True)
 
-        m[2].markdown(T.tile("Improving / Stable", f"{deescalated} Plants"), unsafe_allow_html=True)
+        m[2].markdown(T.tile('<span style="font-weight:800 !important">Improving / Stable</span>', f"{deescalated} Plants"), unsafe_allow_html=True)
 
         if forecast_backtest is not None:
             _proj = forecast_backtest[
@@ -819,7 +819,7 @@ if VIEW in SEC_PRIORITY:
             # ten. The baseline stays in the subtitle so the gap is visible
             # rather than implied.
             m[3].markdown(T.tile(
-                "Forecast accuracy",
+                '<span style="font-weight:800 !important">Forecast Accuracy</span>',
                 f"{_proj.rank_spearman * 100:.1f}%",
                 "",
                 f"rank agreement with actual · "
@@ -827,7 +827,7 @@ if VIEW in SEC_PRIORITY:
                 f"backtest {_proj.train_years} → {int(_proj.holdout_year)}"),
                 unsafe_allow_html=True)
         else:
-            m[3].markdown(T.tile("Forecast accuracy", "N/A", "",
+            m[3].markdown(T.tile('<span style="font-weight:800 !important">Forecast Accuracy</span>', "N/A", "",
                                  "Needs 2+ years of history to backtest"),
                           unsafe_allow_html=True)
 
@@ -1007,13 +1007,13 @@ if VIEW in SEC_PLANT:
         st.space()
 
         k = st.columns(4)
-        k[0].markdown(T.tile("LIPS", f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
+        k[0].markdown(T.tile('<span style="font-weight:800 !important">LIPS</span>', f"{p.lips:.1f}", f"rank {p.lips_rank}", f"of {n_plants} plants in the current selection"), unsafe_allow_html=True)
 
-        k[1].markdown(T.tile("Water loss rate", f"{p.nrw_pct:.1f}", "%", f"Rank {p.rate_rank} · system average {sys_pct:.1f}%"), unsafe_allow_html=True)
+        k[1].markdown(T.tile('<span style="font-weight:800 !important">Water loss rate</span>', f"{p.nrw_pct:.1f}", "%", f"Rank {p.rate_rank} · system average {sys_pct:.1f}%"), unsafe_allow_html=True)
 
-        k[2].markdown(T.tile("Water lost", m3(p.nrw_m3), "m³", f"Rank {p.volume_rank} · {p.nrw_m3/tot_nrw*100:.1f}% of selection total"), unsafe_allow_html=True)
+        k[2].markdown(T.tile('<span style="font-weight:800 !important">Water lost</span>', m3(p.nrw_m3), "m³", f"Rank {p.volume_rank} · {p.nrw_m3/tot_nrw*100:.1f}% of selection total"), unsafe_allow_html=True)
 
-        k[3].markdown(T.tile("Burst Rate", f"{p.bursts_per_100km:.1f}", "/100km", f"{burst_ratio:.1f}x fleet median ({burst_med:.1f})"), unsafe_allow_html=True)
+        k[3].markdown(T.tile('<span style="font-weight:800 !important">Burst rate</span>', f"{p.bursts_per_100km:.1f}", "/100km", f"{burst_ratio:.1f}x fleet median ({burst_med:.1f})"), unsafe_allow_html=True)
 
         st.space()
         c1, c2 = st.columns([1.4, 1])
@@ -1139,11 +1139,11 @@ if VIEW in SEC_PLANT:
             # Standard HTML superscript with a hover tooltip for k1
             pp_label = 'pp <sup title="Percentage Points: Absolute difference between percentage values" style="cursor:pointer; color:#6b7280; font-weight:bold; font-size:18px">?</sup>'
 
-            k1.markdown(T.tile("Unexplained Deviation", f"{gap_pp:+.1f} {pp_label}", 
+            k1.markdown(T.tile('<span style="font-weight:800 !important">Unexplained deviation</span>', f"{gap_pp:+.1f} {pp_label}", 
                         "vs actual loss"), unsafe_allow_html=True)
-            k2.markdown(T.tile("Unaccounted Volume", f"{m3(gap_m3)} m³", 
+            k2.markdown(T.tile('<span style="font-weight:800 !important">Unaccounted volume</span>', f"{m3(gap_m3)} m³", 
                                "volume annually"), unsafe_allow_html=True)
-            k3.markdown(T.tile("Daily Recovery Potential", f"{m3(daily_m3_lost)} m³", 
+            k3.markdown(T.tile('<span style="font-weight:800 !important">Daily recovery potential</span>', f"{m3(daily_m3_lost)} m³", 
                                "volume per day"), unsafe_allow_html=True)
 
             # Diagnostic Action Banner
