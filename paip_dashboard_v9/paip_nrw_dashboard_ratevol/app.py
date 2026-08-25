@@ -24,7 +24,7 @@ DATA = Path(__file__).parent / "data"
 ASSETS = Path(__file__).parent / "assets"
 
 st.set_page_config(page_title="PAIP NRW — Intervention Priority",
-                   page_icon="◔", layout="wide",
+                   page_icon=":material/water_drop:", layout="wide",
                    initial_sidebar_state="expanded")
 
 
