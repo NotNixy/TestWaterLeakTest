@@ -1258,22 +1258,44 @@ if VIEW in SEC_PLANT:
             ], height=420)
     if VIEW == "pcomp":
         st.markdown("### :material/compare: <b>Side-by-Side Plant Comparison</b>", unsafe_allow_html=True)
-        
+
         # --- Key Metrics Comparison Table/Tiles ---
+        # Small inline SVGs, not :material/...: shortcodes — those only expand
+        # inside Streamlit's own markdown parser, not raw unsafe_allow_html HTML
+        # (T.tile() returns a plain HTML string). Neutral/muted color on purpose:
+        # this is a factual "which number is bigger" comparison, not a verdict —
+        # for water loss / burst rate, the *lower* number is actually the better one.
+        _CMP_STYLE = 'style="vertical-align:-0.1em;margin-left:4px;"'
+        _ICO_UP = (f'<svg width="0.85em" height="0.85em" viewBox="0 0 16 16" fill="none" '
+                   f'stroke="currentColor" stroke-width="2" {_CMP_STYLE}>'
+                   f'<path d="M4 10l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+        _ICO_DOWN = (f'<svg width="0.85em" height="0.85em" viewBox="0 0 16 16" fill="none" '
+                     f'stroke="currentColor" stroke-width="2" {_CMP_STYLE}>'
+                     f'<path d="M4 6l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+        _ICO_EQUAL = (f'<svg width="0.85em" height="0.85em" viewBox="0 0 16 16" fill="none" '
+                      f'stroke="currentColor" stroke-width="2" {_CMP_STYLE}>'
+                      f'<path d="M3 6h10M3 10h10" stroke-linecap="round"/></svg>')
+
+        def _cmp_icon(val_a, val_b, tol=1e-9):
+            """Icon on val_a's tile showing how it compares to val_b: higher, lower, or equal."""
+            if abs(val_a - val_b) <= tol:
+                return _ICO_EQUAL
+            return _ICO_UP if val_a > val_b else _ICO_DOWN
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f"#### **{plant}** (Selected)")
-            st.markdown(T.tile("LIPS Score", f"{p.lips:.1f}", f"Rank {p.lips_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Water Loss Rate", f"{p.nrw_pct:.1f}%", f"Rank {p.rate_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Water Lost", f"{m3(p.nrw_m3)} m³", f"Rank {p.volume_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Burst Rate", f"{p.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"LIPS Score{_cmp_icon(p.lips, p2.lips)}", f"{p.lips:.1f}", f"Rank {p.lips_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Water Loss Rate{_cmp_icon(p.nrw_pct, p2.nrw_pct)}", f"{p.nrw_pct:.1f}%", f"Rank {p.rate_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Water Lost{_cmp_icon(p.nrw_m3, p2.nrw_m3)}", f"{m3(p.nrw_m3)} m³", f"Rank {p.volume_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Burst Rate{_cmp_icon(p.bursts_per_100km, p2.bursts_per_100km)}", f"{p.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
 
         with c2:
             st.markdown(f"#### **{p2_name}** (Comparison)")
-            st.markdown(T.tile("LIPS Score", f"{p2.lips:.1f}", f"Rank {p2.lips_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Water Loss Rate", f"{p2.nrw_pct:.1f}%", f"Rank {p2.rate_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Water Lost", f"{m3(p2.nrw_m3)} m³", f"Rank {p2.volume_rank}"), unsafe_allow_html=True)
-            st.markdown(T.tile("Burst Rate", f"{p2.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"LIPS Score{_cmp_icon(p2.lips, p.lips)}", f"{p2.lips:.1f}", f"Rank {p2.lips_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Water Loss Rate{_cmp_icon(p2.nrw_pct, p.nrw_pct)}", f"{p2.nrw_pct:.1f}%", f"Rank {p2.rate_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Water Lost{_cmp_icon(p2.nrw_m3, p.nrw_m3)}", f"{m3(p2.nrw_m3)} m³", f"Rank {p2.volume_rank}"), unsafe_allow_html=True)
+            st.markdown(T.tile(f"Burst Rate{_cmp_icon(p2.bursts_per_100km, p.bursts_per_100km)}", f"{p2.bursts_per_100km:.1f}", "/100km"), unsafe_allow_html=True)
 
         st.markdown("")
         st.markdown("")
